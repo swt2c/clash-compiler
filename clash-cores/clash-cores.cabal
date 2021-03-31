@@ -74,6 +74,9 @@ library
   hs-source-dirs: src
 
   exposed-modules:
+    Clash.Cores.Floating.Xilinx
+    Clash.Cores.Floating.Xilinx.BlackBoxes
+    Clash.Cores.Floating.Xilinx.Internal
     Clash.Cores.SPI
     Clash.Cores.LatticeSemi.ICE40.IO
     Clash.Cores.LatticeSemi.ICE40.Blackboxes.IO
