@@ -17,23 +17,21 @@ defFloatingC = FloatingConfig
   }
 
 absFloat
-  :: KnownDomain dom
-  => Signal dom Float
-  -> Signal dom Float
-absFloat = undefined
+  :: Float
+  -> Float
+absFloat x = unpack $ pack x .&. (-1) `shiftR` 1
 
 negateFloat
-  :: KnownDomain dom
-  => Signal dom Float
-  -> Signal dom Float
-negateFloat = undefined
+  :: Float
+  -> Float
+negateFloat x = unpack $ pack x `xor` (1 `shiftL` 31)
 
 copySignFloat
-  :: KnownDomain dom
-  => Signal dom Float
-  -> Signal dom Float
-  -> Signal dom Float
-copySignFloat = undefined
+  :: Float
+  -> Float
+  -> Float
+copySignFloat x y = unpack $     pack x .&. (-1) `shiftR` 1
+                             .|. pack y .&. 1 `shiftL` 31
 
 addFloat
   :: forall d dom n
