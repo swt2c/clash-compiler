@@ -53,8 +53,41 @@ addFloat# !_ clk en x y = delayI undefined en clk $ x + y
        -> DSignal dom n Float         -- a , ARG[5]
        -> DSignal dom n Float         -- b , ARG[6]
        -> DSignal dom (n + d) Float"
-      , "kind"      : "Expression"
-      , "template"  : "~DEVNULL[~LIT[2]]~ARG[5] + ~ARG[6]"
+      , "kind"      : "Declaration"
+      , "template"  :
+    "-- addFloat begin
+    ~DEVNULL[~LIT[2]]~GENSYM[addFloat][0] : block
+      COMPONENT ~INCLUDENAME[0]
+        PORT (
+          aclk : IN STD_LOGIC;
+          aclken : IN STD_LOGIC;
+          s_axis_a_tvalid : IN STD_LOGIC;
+          s_axis_a_tdata : IN STD_LOGIC_VECTOR(31 DOWNTO 0);
+          s_axis_b_tvalid : IN STD_LOGIC;
+          s_axis_b_tdata : IN STD_LOGIC_VECTOR(31 DOWNTO 0);
+          m_axis_result_tvalid : OUT STD_LOGIC;
+          m_axis_result_tdata : OUT STD_LOGIC_VECTOR(31 DOWNTO 0)
+        );
+      END COMPONENT;
+      signal ~GENSYM[clken_std][2]: std_logic;
+      signal ~GENSYM[result][3]: std_logic_vector(31 downto 0);
+    begin
+      ~SYM[2] <= '1' when (~ARG[4]) else '0';
+      ~RESULT <= ~FROMBV[~SYM[3]][~TYPO];
+      ~GENSYM[addFloat][1] : ~INCLUDENAME[0]
+        PORT MAP (
+          aclk => ~ARG[3],
+          aclken => ~SYM[2],
+          s_axis_a_tvalid => '1',
+          s_axis_a_tdata => ~TOBV[~ARG[5]][~TYP[5]],
+          s_axis_b_tvalid => '1',
+          s_axis_b_tdata => ~TOBV[~ARG[6]][~TYP[6]],
+          m_axis_result_tvalid => open,
+          m_axis_result_tdata => ~SYM[3]
+        );
+
+    end block;
+    -- addFloat end"
       , "includes"  : [ {"extension": "tcl"
                         ,"name": "floating_point"
                         ,"format": "Haskell"
