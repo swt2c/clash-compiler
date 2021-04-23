@@ -60,8 +60,8 @@ addFloat# !_ clk en x y = delayI undefined en clk $ x + y
       COMPONENT ~INCLUDENAME[0]
         PORT (
           aclk : IN STD_LOGIC;
-          aclken : IN STD_LOGIC;
-          s_axis_a_tvalid : IN STD_LOGIC;
+    ~IF~ISACTIVEENABLE[4]~THEN      aclken : IN STD_LOGIC;
+    ~ELSE~FI      s_axis_a_tvalid : IN STD_LOGIC;
           s_axis_a_tdata : IN STD_LOGIC_VECTOR(31 DOWNTO 0);
           s_axis_b_tvalid : IN STD_LOGIC;
           s_axis_b_tdata : IN STD_LOGIC_VECTOR(31 DOWNTO 0);

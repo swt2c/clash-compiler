@@ -42,7 +42,7 @@ addSubFloatTclTemplate
   -> State s Doc
 addSubFloatTclTemplate addSubVal bbCtx = pure bbText
  where
-  primName = bbQsysIncName bbCtx !! 0
+  compName = bbQsysIncName bbCtx !! 0
 
   (Literal _ (NumLit latency), _, _) = bbInputs bbCtx !! 1
   (DataCon _ _ cfgExprs, _, _) = bbInputs bbCtx !! 2
@@ -74,24 +74,30 @@ addSubFloatTclTemplate addSubVal bbCtx = pure bbText
 
   -- Literal Nothing (BoolLit cfgBMemUsage) = cfgBMemUsageExpr
 
+  tclClkEn :: String
+  tclClkEn =
+    case bbInputs bbCtx !! 4 of
+      (DataCon _ _ [Literal Nothing (BoolLit True)], _, _) -> "false"
+      _                                                    -> "true"
+
   bbText = fromString $ unindent [i|
     create_ip -name floating_point -vendor xilinx.com -library ip \\
-              -version 7.1 -module_name {#{primName}}
-    set_property -dict [list CONFIG.Add_Sub_Value {#{addSubVal}} \\
-                             CONFIG.C_Optimization {#{tclArchOpt}} \\
-                             CONFIG.C_Mult_Usage {#{tclDspUsage}} \\
-                             CONFIG.Flow_Control {NonBlocking} \\
-                             CONFIG.Has_ACLKEN {true} \\
-                             CONFIG.Has_RESULT_TREADY {false} \\
-                             CONFIG.C_Latency {#{latency}}] \\
-                       [get_ips {#{primName}}]
-    generate_target {synthesis simulation} [get_ips {#{primName}}]
+              -version 7.1 -module_name {#{compName}}
+    set_property -dict [list CONFIG.Add_Sub_Value #{addSubVal} \\
+                             CONFIG.C_Optimization #{tclArchOpt} \\
+                             CONFIG.C_Mult_Usage #{tclDspUsage} \\
+                             CONFIG.Flow_Control NonBlocking \\
+                             CONFIG.Has_ACLKEN #{tclClkEn} \\
+                             CONFIG.Has_RESULT_TREADY false \\
+                             CONFIG.C_Latency #{latency}] \\
+                       [get_ips {#{compName}}]
+    generate_target {synthesis simulation} [get_ips {#{compName}}]
     |]
 {-
     Hello world!
 
     Name:
-    #{primName}
+    #{compName}
 
     Latency:
     #{latency}
