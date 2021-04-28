@@ -31,9 +31,7 @@ addSubFloatTclTF addSubVal =
   TemplateFunction used valid (addSubFloatTclTemplate addSubVal)
  where
   used = [0..4]
-  valid bbCtx = cfgIsLit
-    where
-      (_, _, cfgIsLit) = bbInputs bbCtx !! 2
+  valid = const True
 
 addSubFloatTclTemplate
   :: Backend s
@@ -50,10 +48,7 @@ addSubFloatTclTemplate addSubVal bbCtx = pure bbText
   cfgDspUsageExpr = cfgExprs !! 1
   -- cfgBMemUsageExpr = cfgExprs !! 2
 
-  DataCon _ cfgArchOptMod _ = cfgArchOptExpr
-  DC (cfgArchOptHWType, cfgArchOptTag) = cfgArchOptMod
-  Sum _ cfgArchOptConstrs = cfgArchOptHWType
-  -- DataCon _ (DC (Sum _ cfgArchOptConstrs, cfgArchOptTag)) _ = cfgArchOptExpr
+  DataCon _ (DC (Sum _ cfgArchOptConstrs, cfgArchOptTag)) _ = cfgArchOptExpr
   cfgArchOpt = cfgArchOptConstrs !! cfgArchOptTag
   tclArchOpt :: String
   tclArchOpt =

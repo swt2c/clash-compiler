@@ -39,6 +39,9 @@ addFloat#
   -> DSignal dom n Float
   -> DSignal dom (n + d) Float
 addFloat# !_ clk en x y = delayI undefined en clk $ x + y
+{- Note: BlackBox template includes ~DEVNULL[~LIT[2]] which will ensure
+ - ...BlackBoxes.addFloatTclTF gets a fully evaluated FloatingConfig.
+ -}
 {-# ANN addFloat# (InlinePrimitive [VHDL] $ unindent [i|
   [ { "BlackBox" :
       { "name"      : "Clash.Cores.Floating.Xilinx.Internal.addFloat#"
