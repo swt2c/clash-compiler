@@ -80,8 +80,8 @@ addFloat# !_ clk en x y = delayI undefined en clk $ x + y
       ~GENSYM[addFloat][1] : ~INCLUDENAME[0]
         PORT MAP (
           aclk => ~ARG[3],
-          aclken => ~SYM[2],
-          s_axis_a_tvalid => '1',
+    ~IF~ISACTIVEENABLE[4]~THEN      aclken => ~SYM[2],
+    ~ELSE~FI      s_axis_a_tvalid => '1',
           s_axis_a_tdata => ~TOBV[~ARG[5]][~TYP[5]],
           s_axis_b_tvalid => '1',
           s_axis_b_tdata => ~TOBV[~ARG[6]][~TYP[6]],
