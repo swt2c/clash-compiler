@@ -27,6 +27,14 @@ data FloatingDspUsage
   | FullDspUsage
   deriving (Eq, Show)
 
+conditionFloat
+  :: Float
+  -> Float
+conditionFloat x
+  | isNaN x          = - 0/0 -- Quiet NaN, no payload, positive
+  | isDenormalized x = if x > 0 then 0 else -0
+  | otherwise        = x
+
 addFloat#
   :: forall d dom n
    . ( KnownDomain dom
