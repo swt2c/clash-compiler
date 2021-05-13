@@ -3,12 +3,14 @@
 module Xilinx where
 
 import Clash.Prelude
+import qualified Prelude as P
 
 import Clash.Explicit.Testbench
 
 import Clash.Cores.Floating.Xilinx
 
 import Xilinx.Annotations
+import Xilinx.TH
 
 addFloatBasic
   :: Clock XilinxSystem
@@ -32,13 +34,13 @@ basicTB
       -> DSignal XilinxSystem 0 Float
       -> DSignal XilinxSystem d Float
      )
-  -> Vec n (Float, Float)
-  -> Vec n Float
+  -> Vec n (Float, Float, Float)
   -> Signal XilinxSystem Bool
-basicTB comp inputs expectedOutput = done
+basicTB comp samples = done
   where
-    testInputX = fromSignal $ stimuliGenerator clk rst (map fst inputs)
-    testInputY = fromSignal $ stimuliGenerator clk rst (map snd inputs)
+    (inputX, inputY, expectedOutput) = unzip3 samples
+    testInputX = fromSignal $ stimuliGenerator clk rst inputX
+    testInputY = fromSignal $ stimuliGenerator clk rst inputY
     expectOutput = outputVerifier' clk rst (repeat @d 0 ++ expectedOutput)
     done = expectOutput $ ignoreFor clk rst en (SNat @d) 0
       $ toSignal $ comp clk en testInputX testInputY
@@ -47,16 +49,10 @@ basicTB comp inputs expectedOutput = done
     en = enableGen
 {-# INLINE basicTB #-}
 
+
 addFloatBasicTB :: Signal XilinxSystem Bool
 addFloatBasicTB =
   basicTB
     addFloatBasic
-    inputs
-    (map (uncurry (+)) inputs)
- where
-  inputs = $(listToVecTH
-    [ (1, 1) :: (Float, Float)
-    , (2, 1)
-    , (3, 1)
-    ])
+    $(listToVecTH addFloatBasicSamples)
 {-# ANN addFloatBasicTB (TestBench 'addFloatBasic) #-}

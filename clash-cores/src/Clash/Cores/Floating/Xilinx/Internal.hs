@@ -1,6 +1,7 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE ViewPatterns #-}
 module Clash.Cores.Floating.Xilinx.Internal
 where
 
@@ -35,6 +36,12 @@ conditionFloat x
   | isDenormalized x = if x > 0 then 0 else -0
   | otherwise        = x
 
+conditionFloatF
+  :: Functor f
+  => f Float
+  -> f Float
+conditionFloatF = fmap conditionFloat
+
 addFloat#
   :: forall d dom n
    . ( KnownDomain dom
@@ -46,7 +53,9 @@ addFloat#
   -> DSignal dom n Float
   -> DSignal dom n Float
   -> DSignal dom (n + d) Float
-addFloat# !_ clk en x y = delayI undefined en clk $ x + y
+addFloat# !_ clk en (conditionFloatF -> x) (conditionFloatF -> y) =
+  delayI undefined en clk $ x + y
+
 {- Note: BlackBox template includes ~DEVNULL[~LIT[2]] which will ensure
  - ...BlackBoxes.addFloatTclTF gets a fully evaluated FloatingConfig.
  -}
