@@ -14,12 +14,11 @@ import Xilinx.TH
 
 addFloatBasic
   :: Clock XilinxSystem
-  -> Enable XilinxSystem
   -> DSignal XilinxSystem 0 Float
   -> DSignal XilinxSystem 0 Float
   -> DSignal XilinxSystem 12 Float
-addFloatBasic clk en x y
-  = withClock clk $ withEnable en $ addFloat' x y
+addFloatBasic clk x y
+  = withClock clk $ withEnable enableGen $ addFloat' x y
 {-# NOINLINE addFloatBasic #-}
 {-# ANN addFloatBasic (binTopAnn "addFloatBasic") #-}
 
@@ -29,7 +28,6 @@ basicTB
      , KnownNat d
      )
   => (  Clock XilinxSystem
-      -> Enable XilinxSystem
       -> DSignal XilinxSystem 0 Float
       -> DSignal XilinxSystem 0 Float
       -> DSignal XilinxSystem d Float
@@ -43,7 +41,7 @@ basicTB comp samples = done
     testInputY = fromSignal $ stimuliGenerator clk rst inputY
     expectOutput = outputVerifier' clk rst (repeat @d 0 ++ expectedOutput)
     done = expectOutput $ ignoreFor clk rst en (SNat @d) 0
-      $ toSignal $ comp clk en testInputX testInputY
+      $ toSignal $ comp clk testInputX testInputY
     clk = tbClockGen @XilinxSystem (not <$> done)
     rst = resetGen @XilinxSystem
     en = enableGen

@@ -2,6 +2,8 @@ module Xilinx.TH where
 
 import Prelude
 
+import Clash.Cores.Floating.Xilinx.Internal (xilinxNaN)
+
 addFloatBasicSamples
   :: [(Float, Float, Float)]
 
@@ -9,6 +11,18 @@ addFloatBasicSamples =
   [ (1, 4, 5)
   , (2, 5, 7)
   , (3, 6, 9)
+    -- Subnormal positive number is conditioned to plus zero
+    --
+    -- The unconditioned result is the subnormal of largest magnitude
+  , ( encodeFloat (-(2 ^ (digits - 1))) (minExp - digits)
+    , encodeFloat (2 ^ digits - 1) (minExp - digits)
+    , 0
+    )
+    -- The unconditioned result is the subnormal of smallest magnitude
+  , ( encodeFloat (-(2 ^ (digits - 1))) (minExp - digits)
+    , encodeFloat (2 ^ (digits - 1) + 1) (minExp - digits)
+    , 0
+    )
     -- Subnormal negative number is conditioned to minus zero
     --
     -- The unconditioned result is the subnormal of largest magnitude
@@ -97,6 +111,9 @@ addFloatBasicSamples =
     , encodeFloat (2 ^ digits - 1) (maxExp - 2*digits - 1)
     , encodeFloat (2 ^ digits - 1) (maxExp - digits)
     )
+  , (1/0, 1, 1/0)
+  , (-1/0, 1, -1/0)
+  , (1/0, -1/0, xilinxNaN)
   ]
  where
    digits = floatDigits (undefined :: Float)
