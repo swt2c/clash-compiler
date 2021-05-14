@@ -8,6 +8,18 @@ binTopAnn name =
     { t_name   = name
     , t_inputs =
           [ PortName "clk"
+          , PortName "x"
+          , PortName "y"
+          ]
+    , t_output = PortName "result"
+    }
+
+binEnTopAnn :: String -> TopEntity
+binEnTopAnn name =
+  Synthesize
+    { t_name   = name
+    , t_inputs =
+          [ PortName "clk"
           , PortName "en"
           , PortName "x"
           , PortName "y"

@@ -15,4 +15,11 @@ asPack = P.map (\(a, b, c) -> (pack a, pack b, pack c)) samples
 asDecode =
   P.map (\(a, b, c) -> (decodeFloat a, decodeFloat b, decodeFloat c)) samples
 
-runTB = P.head . P.dropWhile not $ sample addFloatBasicTB
+runTB
+  :: KnownDomain dom
+  => Signal dom Bool
+  -> IO ()
+runTB tb
+  = let len = P.length . P.takeWhile not $ sample tb
+    in len `seq` putStrLn $      "Testbench finished after " P.++ (show len)
+                            P.++ " cycles."
