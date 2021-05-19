@@ -1,4 +1,3 @@
-{-# LANGUAGE QuasiQuotes #-}
 module Clash.Cores.Floating.Xilinx
   ( module Clash.Cores.Floating.Xilinx
   , module Clash.Cores.Floating.Xilinx.Internal
