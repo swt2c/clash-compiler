@@ -66,6 +66,8 @@ basicTB comp samples = done
     en = enableGen
 {-# INLINE basicTB #-}
 
+-- TODO: Determine whether it will be useful to run this test bench as anything
+-- other than addFloat. If not, remove the genericity.
 enableTB
   :: forall d
    . KnownNat d
@@ -80,9 +82,9 @@ enableTB
 enableTB comp f0 = done
   where
     f i = f0 i i
+    d = natToNum @d
     testInput =
-      fromSignal $ stimuliGenerator clk rst
-          $(listToVecTH [1 :: Float .. 30])
+      fromSignal $ stimuliGenerator clk rst $ iterateI @(d + 14) succ 1
     en =
       toEnable $ stimuliGenerator clk rst
           (   (repeat @d True ++ replicate d4 True ++ replicate d4 False)
@@ -91,10 +93,10 @@ enableTB comp f0 = done
     -- based on @d instead!
     expectedOutput =
          repeat @d 0
-      ++ map f $(listToVecTH [1 :: Float .. 4])
+      ++ map f (iterate d4 succ 1)
       ++ replicate d5 (f 5)
-      ++ map f $(listToVecTH [6 :: Float .. 16])
-      ++ map f $(listToVecTH [21 :: Float .. 30])
+      ++ map f (iterateI @(d + 5) succ 6)
+      ++ map f (iterate d5 succ (d + 9))
     expectOutput =
       outputVerifier' clk rst expectedOutput
     done = expectOutput $ ignoreFor clk rst enableGen (SNat @d) 0
@@ -116,114 +118,184 @@ addFloatBasic clk x y
 addFloatBasicSamples
   :: Vec _ (Float, Float, Float)
 addFloatBasicSamples =
-     (1, 4, 5)
-  :> (2, 5, 7)
-  :> (3, 6, 9)
-     -- Subnormal positive number is conditioned to plus zero
-     --
-     -- The unconditioned result is the subnormal of largest magnitude
-  :> ( encodeFloat (-(2 ^ (digits - 1))) (minExp - digits)
-     , encodeFloat (2 ^ digits - 1) (minExp - digits)
-     , 0
-     )
-     -- The unconditioned result is the subnormal of smallest magnitude
-  :> ( encodeFloat (-(2 ^ (digits - 1))) (minExp - digits)
-     , encodeFloat (2 ^ (digits - 1) + 1) (minExp - digits)
-     , 0
-     )
-     -- Subnormal negative number is conditioned to minus zero
-     --
-     -- The unconditioned result is the subnormal of largest magnitude
-  :> ( encodeFloat (2 ^ (digits - 1)) (minExp - digits)
-     , encodeFloat (-(2 ^ digits - 1)) (minExp - digits)
-     , -0
-     )
-     -- The unconditioned result is the subnormal of smallest magnitude
-  :> ( encodeFloat (2 ^ (digits - 1)) (minExp - digits)
-     , encodeFloat (-(2 ^ (digits - 1) + 1)) (minExp - digits)
-     , -0
-     )
-     -- Round to nearest
-     --
-     -- For a datatype with 4 bits of precision, the significands align as:
-     -- 1000
-     --     1001
-     -- -------- +
-     -- 1001
-  :> ( 2 ^ (digits - 1)
-     , encodeFloat (2 ^ (digits - 1) + 1) (-digits)
-     , 2 ^ (digits - 1) + 1
-     )
-     -- 1000
-     --     01111
-     -- --------- +
-     -- 1000
-  :> ( 2 ^ (digits - 1)
-     , encodeFloat (2 ^ digits - 1) (-digits - 1)
-     , 2 ^ (digits - 1)
-     )
-     -- Ties to even
-     --
-     -- 1000
-     --     1000
-     -- -------- +
-     -- 1000
-  :> ( 2 ^ (digits - 1)
-     , encodeFloat (2 ^ (digits - 1)) (-digits)
-     , 2 ^ (digits - 1)
-     )
-     -- Round to nearest
-     --
-     -- For a datatype with 4 bits of precision, the significands align as:
-     -- 1001
-     --     1001
-     -- -------- +
-     -- 1010
-  :> ( 2 ^ (digits - 1) + 1
-     , encodeFloat (2 ^ (digits - 1) + 1) (-digits)
-     , 2 ^ (digits - 1) + 2
-     )
-     -- 1001
-     --     01111
-     -- --------- +
-     -- 1001
-  :> ( 2 ^ (digits - 1) + 1
-     , encodeFloat (2 ^ digits - 1) (-digits - 1)
-     , 2 ^ (digits - 1) + 1
-     )
-     -- Ties to even
-     --
-     -- 1001
-     --     1000
-     -- -------- +
-     -- 1010
-  :> ( 2 ^ (digits - 1) + 1
-     , encodeFloat (2 ^ (digits - 1)) (-digits)
-     , 2 ^ (digits - 1) + 2
-     )
-     -- Rounding at maximum exponent
-     --
-     -- 1111
-     --     1000
-     -- -------- +
-     -- infinity
-  :> ( encodeFloat (2 ^ digits - 1) (maxExp - digits)
-     , encodeFloat (2 ^ (digits - 1)) (maxExp - 2*digits)
-     , 1/0
-     )
-     -- 1111
-     --     01111
-     -- --------- +
-     -- 1111
-  :> ( encodeFloat (2 ^ digits - 1) (maxExp - digits)
-     , encodeFloat (2 ^ digits - 1) (maxExp - 2*digits - 1)
-     , encodeFloat (2 ^ digits - 1) (maxExp - digits)
-     )
-  :> (1/0, 1, 1/0)
-  :> (-1/0, 1, -1/0)
-  :> (1/0, -1/0, xilinxNaN)
+--      (1, 4, 5)
+--   :> (2, 5, 7)
+--   :> (3, 6, 9)
+--      -- Subnormal positive number is conditioned to plus zero
+--      --
+--      -- The unconditioned result is the subnormal of largest magnitude
+--   :> ( encodeFloat (-(2 ^ (digits - 1))) (minExp - digits)
+--      , encodeFloat (2 ^ digits - 1) (minExp - digits)
+--      , 0
+--      )
+--      -- The unconditioned result is the subnormal of smallest magnitude
+--   :> ( encodeFloat (-(2 ^ (digits - 1))) (minExp - digits)
+--      , encodeFloat (2 ^ (digits - 1) + 1) (minExp - digits)
+--      , 0
+--      )
+--      -- Subnormal negative number is conditioned to minus zero
+--      --
+--      -- The unconditioned result is the subnormal of largest magnitude
+--   :> ( encodeFloat (2 ^ (digits - 1)) (minExp - digits)
+--      , encodeFloat (-(2 ^ digits - 1)) (minExp - digits)
+--      , -0
+--      )
+--      -- The unconditioned result is the subnormal of smallest magnitude
+--   :> ( encodeFloat (2 ^ (digits - 1)) (minExp - digits)
+--      , encodeFloat (-(2 ^ (digits - 1) + 1)) (minExp - digits)
+--      , -0
+--      )
+--      -- Round to nearest
+--      --
+--      -- For a datatype with 4 bits of precision, the significands align as:
+--      -- 1000
+--      --     1001
+--      -- -------- +
+--      -- 1001
+--   :> ( 2 ^ (digits - 1)
+--      , encodeFloat (2 ^ (digits - 1) + 1) (-digits)
+--      , 2 ^ (digits - 1) + 1
+--      )
+--      -- 1000
+--      --     01111
+--      -- --------- +
+--      -- 1000
+--   :> ( 2 ^ (digits - 1)
+--      , encodeFloat (2 ^ digits - 1) (-digits - 1)
+--      , 2 ^ (digits - 1)
+--      )
+--      -- Ties to even
+--      --
+--      -- 1000
+--      --     1000
+--      -- -------- +
+--      -- 1000
+--   :> ( 2 ^ (digits - 1)
+--      , encodeFloat (2 ^ (digits - 1)) (-digits)
+--      , 2 ^ (digits - 1)
+--      )
+--      -- Round to nearest
+--      --
+--      -- For a datatype with 4 bits of precision, the significands align as:
+--      -- 1001
+--      --     1001
+--      -- -------- +
+--      -- 1010
+--   :> ( 2 ^ (digits - 1) + 1
+--      , encodeFloat (2 ^ (digits - 1) + 1) (-digits)
+--      , 2 ^ (digits - 1) + 2
+--      )
+--      -- 1001
+--      --     01111
+--      -- --------- +
+--      -- 1001
+--   :> ( 2 ^ (digits - 1) + 1
+--      , encodeFloat (2 ^ digits - 1) (-digits - 1)
+--      , 2 ^ (digits - 1) + 1
+--      )
+--      -- Ties to even
+--      --
+--      -- 1001
+--      --     1000
+--      -- -------- +
+--      -- 1010
+--   :> ( 2 ^ (digits - 1) + 1
+--      , encodeFloat (2 ^ (digits - 1)) (-digits)
+--      , 2 ^ (digits - 1) + 2
+--      )
+--      -- Rounding at maximum exponent
+--      --
+--      -- 1111
+--      --     1000
+--      -- -------- +
+--      -- infinity
+--   :> ( encodeFloat (2 ^ digits - 1) (maxExp - digits)
+--      , encodeFloat (2 ^ (digits - 1)) (maxExp - 2*digits)
+--      , 1/0
+--      )
+--      -- 1111
+--      --     01111
+--      -- --------- +
+--      -- 1111
+--   :> ( encodeFloat (2 ^ digits - 1) (maxExp - digits)
+--      , encodeFloat (2 ^ digits - 1) (maxExp - 2*digits - 1)
+--      , encodeFloat (2 ^ digits - 1) (maxExp - digits)
+--      )
+--   :> (1/0, 1, 1/0)
+--   :> (-1/0, 1, -1/0)
+--   :> (1/0, -1/0, xilinxNaN)
+--   :> (qNaN0PL, 1, xilinxNaN)
+--   :> (1, qNaN0PL, xilinxNaN)
+--   :> (qNaN0PL, qNaN0PL,xilinxNaN)
+--   :> (negQNaN0PL, 1, xilinxNaN)
+--   :> (1, negQNaN0PL, xilinxNaN)
+--   :> (negQNaN0PL, negQNaN0PL,xilinxNaN)
+--   :> (qNaN1, 1, xilinxNaN)
+--   :> (1, qNaN1, xilinxNaN)
+--   :> (qNaN1, qNaN1,xilinxNaN)
+--   :> (negQNaN1, 1, xilinxNaN)
+--   :> (1, negQNaN1, xilinxNaN)
+--   :> (negQNaN1, negQNaN1,xilinxNaN)
+    (sNaN1, 1, xilinxNaN)
+  :> (1, sNaN1, xilinxNaN)
+  :> (sNaN1, sNaN1,xilinxNaN)
+  :> (negSNaN1, 1, xilinxNaN)
+  :> (1, negSNaN1, xilinxNaN)
+  :> (negSNaN1, negSNaN1,xilinxNaN)
+  :> (qNaNMsb, 1, xilinxNaN)
+  :> (1, qNaNMsb, xilinxNaN)
+  :> (qNaNMsb, qNaNMsb,xilinxNaN)
+  :> (negQNaNMsb, 1, xilinxNaN)
+  :> (1, negQNaNMsb, xilinxNaN)
+  :> (negQNaNMsb, negQNaNMsb,xilinxNaN)
+  :> (sNaNMsb, 1, xilinxNaN)
+  :> (1, sNaNMsb, xilinxNaN)
+  :> (sNaNMsb, sNaNMsb,xilinxNaN)
+  :> (negSNaNMsb, 1, xilinxNaN)
+  :> (1, negSNaNMsb, xilinxNaN)
+  :> (negSNaNMsb, negSNaNMsb,xilinxNaN)
+--   :> (qNaNMax, 1, xilinxNaN)
+--   :> (1, qNaNMax, xilinxNaN)
+--   :> (qNaNMax, qNaNMax,xilinxNaN)
+--   :> (negQNaNMax, 1, xilinxNaN)
+--   :> (1, negQNaNMax, xilinxNaN)
+--   :> (negQNaNMax, negQNaNMax,xilinxNaN)
+--   :> (sNaNMax, 1, xilinxNaN)
+--   :> (1, sNaNMax, xilinxNaN)
+--   :> (sNaNMax, sNaNMax,xilinxNaN)
+--   :> (negSNaNMax, 1, xilinxNaN)
+--   :> (1, negSNaNMax, xilinxNaN)
+--   :> (negSNaNMax, negSNaNMax,xilinxNaN)
+--   :> (qNaNR1, 1, xilinxNaN)
+--   :> (1, qNaNR1, xilinxNaN)
+--   :> (qNaNR1, qNaNR1,xilinxNaN)
+--   :> (negQNaNR1, 1, xilinxNaN)
+--   :> (1, negQNaNR1, xilinxNaN)
+--   :> (negQNaNR1, negQNaNR1,xilinxNaN)
+--   :> (sNaNR1, 1, xilinxNaN)
+--   :> (1, sNaNR1, xilinxNaN)
+--   :> (sNaNR1, sNaNR1,xilinxNaN)
+--   :> (negSNaNR1, 1, xilinxNaN)
+--   :> (1, negSNaNR1, xilinxNaN)
+--   :> (negSNaNR1, negSNaNR1,xilinxNaN)
+--   :> (qNaNR2, 1, xilinxNaN)
+--   :> (1, qNaNR2, xilinxNaN)
+--   :> (qNaNR2, qNaNR2,xilinxNaN)
+--   :> (negQNaNR2, 1, xilinxNaN)
+--   :> (1, negQNaNR2, xilinxNaN)
+--   :> (negQNaNR2, negQNaNR2,xilinxNaN)
+--   :> (sNaNR2, 1, xilinxNaN)
+--   :> (1, sNaNR2, xilinxNaN)
+--   :> (sNaNR2, sNaNR2,xilinxNaN)
+--   :> (negSNaNR2, 1, xilinxNaN)
+--   :> (1, negSNaNR2, xilinxNaN)
+--   :> (negSNaNR2, negSNaNR2,xilinxNaN)
   :> Nil
-  ++ concatMap testNaN
+ where
+   digits = floatDigits (undefined :: Float)
+   (minExp, maxExp) = floatRange (undefined :: Float)
+{-
+++ concatMap testNaN
        (   qNaN0PL
 --         :> negQNaN0PL
 --         :> qNaN1
@@ -247,15 +319,13 @@ addFloatBasicSamples =
 --         :> sNaNR2
 --         :> negSNaNR2
         :> Nil)
- where
-   digits = floatDigits (undefined :: Float)
-   (minExp, maxExp) = floatRange (undefined :: Float)
    testNaN :: Float -> Vec 3 (Float, Float, Float)
    testNaN nan =
         (nan, 1, xilinxNaN)
      :> (1, nan, xilinxNaN)
      :> (nan, nan, xilinxNaN)
      :> Nil
+-}
 
 addFloatBasicTB :: Signal XilinxSystem Bool
 addFloatBasicTB = basicTB addFloatBasic addFloatBasicSamples
@@ -272,9 +342,9 @@ addFloatEnable clk en x y
 {-# NOINLINE addFloatEnable #-}
 {-# ANN addFloatEnable (binEnTopAnn "addFloatEnable") #-}
 
-addFloatEnableTB :: Signal XilinxSystem Bool
-addFloatEnableTB = enableTB addFloatEnable (+)
-{-# ANN addFloatEnableTB (TestBench 'addFloatEnable) #-}
+-- addFloatEnableTB :: Signal XilinxSystem Bool
+-- addFloatEnableTB = enableTB addFloatEnable (+)
+-- {-# ANN addFloatEnableTB (TestBench 'addFloatEnable) #-}
 
 -- Quiet NaN with no payload
 -- Actually, this is equal to xilinxNaN
