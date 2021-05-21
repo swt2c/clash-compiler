@@ -51,9 +51,9 @@ basicTB
       -> DSignal XilinxSystem 0 Float
       -> DSignal XilinxSystem d Float
      )
-  -> Vec n (Float, Float, Float)
+  ->
   -> Signal XilinxSystem Bool
-basicTB comp samples = done
+basicTB comp sampleFile = done
   where
     (inputX, inputY, expectedOutput) = unzip3 samples
     testInputX = fromSignal $ stimuliGenerator clk rst inputX

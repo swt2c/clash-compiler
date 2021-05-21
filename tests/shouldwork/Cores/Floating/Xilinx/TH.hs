@@ -22,6 +22,24 @@ romDataFromFile
   -> ExpQ
 romDataFromFile file es = qRunIO (createRomFile file es) >> litE (stringL file)
 
+addDone
+  :: [a]
+  -> [(Bool, a)]
+addDone [e]    = [(True, e)]
+addDone (e:es) = (False, e):addDone es
+addDone []     = []
+
+delayOutput
+  :: Int
+  -> [(Float, Float, Float)]
+  -> [(Float, Float, Float)]
+delayOutput d es = zip3 xs ys rs
+  where
+    (xs0, ys0, rs0) = unzip3 es
+    xs = xs0 ++ repeat (last xs0)
+    ys = ys0 ++ repeat (last ys0)
+    rs = replicate d 0 ++ rs0
+
 addFloatBasicSamples
   :: [(Float, Float, Float)]
 
