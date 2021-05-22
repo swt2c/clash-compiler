@@ -7,13 +7,13 @@ import qualified Prelude as P
 import Text.Show.Pretty (pPrint)
 
 import Xilinx
--- import Xilinx.TH
+import Xilinx.TH
 
 samples = addFloatBasicSamples
 
-asPack = map (\(a, b, c) -> (pack a, pack b, pack c)) samples
+asPack = P.map (\(a, b, c) -> (pack a, pack b, pack c)) samples
 asDecode =
-  map (\(a, b, c) -> (decodeFloat a, decodeFloat b, decodeFloat c)) samples
+  P.map (\(a, b, c) -> (decodeFloat a, decodeFloat b, decodeFloat c)) samples
 
 runTB
   :: KnownDomain dom

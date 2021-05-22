@@ -5,6 +5,7 @@ module Xilinx where
 import Clash.Prelude hiding ((^))
 import Prelude ((^))
 import qualified Prelude as P
+import qualified Clash.Explicit.Prelude as CEP
 
 import Numeric (showHex)
 
@@ -14,6 +15,7 @@ import Clash.Cores.Floating.Xilinx
 -- import Clash.Cores.Floating.Xilinx.Internal (xilinxNaN)
 
 import Xilinx.Annotations
+import Xilinx.TH
 
 newtype FloatVerifier = FloatVerifier Float
 
@@ -31,36 +33,56 @@ floatVerifierShowsPrec#
   -> FloatVerifier
   -> ShowS
 floatVerifierShowsPrec# _ (FloatVerifier x)
-  | isNaN x = nanSign x . nanString x . showHex (payload x) . (')':)
+  | isNaN x = nanSign . nanString . showHex payload . (')':)
   | otherwise = shows x
  where
-  nanSign x | msb (pack x) == 0 = ('+':)
-            | otherwise         = ('-':)
-  nanString x
+  nanSign | msb (pack x) == 0 = ('+':)
+          | otherwise         = ('-':)
+  nanString
     | testBit (pack x) 22 = ("qNaN(0x" P.++)
     | otherwise           = ("sNaN(0x" P.++)
-  payload x = truncateB (pack x) :: BitVector 22
+  payload = truncateB $ pack x :: BitVector 22
+
+playSampleRom
+  :: forall n a dom
+   . ( KnownDomain dom
+     , KnownNat n
+     , BitPack a
+     , 1 <= n
+     )
+  => Clock dom
+  -> Reset dom
+  -> (SNat n, FilePath)
+  -> (Signal dom Bool, Signal dom a)
+playSampleRom clk rst (n, file) = (done, out)
+ where
+  out = unpack . asyncRomFile n file <$> cnt
+  done = CEP.register clk rst enableGen False $ (== maxBound) <$> cnt
+  cnt :: Signal dom (Index n)
+  cnt = CEP.register clk rst enableGen 0 $ satSucc SatBound <$> cnt
 
 basicTB
-  :: forall n d
+  :: forall d n
    . ( KnownNat n
      , KnownNat d
+     , 1 <= n
      )
   => (   Clock XilinxSystem
       -> DSignal XilinxSystem 0 Float
       -> DSignal XilinxSystem 0 Float
       -> DSignal XilinxSystem d Float
      )
-  ->
+  -> (SNat n, FilePath)
   -> Signal XilinxSystem Bool
-basicTB comp sampleFile = done
+basicTB comp (n, sampleFile) = done
   where
-    (inputX, inputY, expectedOutput) = unzip3 samples
-    testInputX = fromSignal $ stimuliGenerator clk rst inputX
-    testInputY = fromSignal $ stimuliGenerator clk rst inputY
-    expectOutput = outputVerifier' clk rst $ map FloatVerifier (repeat @d 0 ++ expectedOutput)
-    done = expectOutput $ fmap FloatVerifier $ ignoreFor clk rst en (SNat @d) 0
-      $ toSignal $ comp clk testInputX testInputY
+    (done0, samples) = playSampleRom clk rst (n, sampleFile)
+    (inputX, inputY, expectedOutput) = unbundle samples
+    -- Only assert while not finished
+    done = mux done0 done0
+      $ assert clk rst "basicTB" out (fmap FloatVerifier expectedOutput) done0
+    out = fmap FloatVerifier $ ignoreFor clk rst en (SNat @d) 0
+      $ toSignal $ comp clk (fromSignal inputX) (fromSignal inputY)
     clk = tbClockGen @XilinxSystem (not <$> done)
     rst = resetGen @XilinxSystem
     en = enableGen
@@ -115,6 +137,7 @@ addFloatBasic clk x y
 {-# NOINLINE addFloatBasic #-}
 {-# ANN addFloatBasic (binTopAnn "addFloatBasic") #-}
 
+{-
 addFloatBasicSamples
   :: Vec _ (Float, Float, Float)
 addFloatBasicSamples =
@@ -326,9 +349,10 @@ addFloatBasicSamples =
      :> (nan, nan, xilinxNaN)
      :> Nil
 -}
+-}
 
 addFloatBasicTB :: Signal XilinxSystem Bool
-addFloatBasicTB = basicTB addFloatBasic addFloatBasicSamples
+addFloatBasicTB = basicTB addFloatBasic $(romDataFromFile "samplerom.bin" addFloatBasicSamples)
 {-# ANN addFloatBasicTB (TestBench 'addFloatBasic) #-}
 
 addFloatEnable
