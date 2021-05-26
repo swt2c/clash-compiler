@@ -1,40 +1,40 @@
 module Xilinx.TH where
 
-import Clash.Prelude (BitPack, pack, SNat(..), unpack)
+import Clash.Prelude (BitPack, natToNum, pack, SNat(..), unpack)
 import Prelude
 
 import Language.Haskell.TH
   (appTypeE, conE, ExpQ, litE, litT, numTyLit, stringL, tupE)
 import Language.Haskell.TH.Syntax (qRunIO)
 
-import Clash.Cores.Floating.Xilinx.Internal (xilinxNaN)
+import Clash.Cores.Floating.Xilinx
+import Clash.Cores.Floating.Xilinx.Internal
+
+showsBitPackFile
+  :: BitPack a
+  => a
+  -> ShowS
+showsBitPackFile
+  x = (((drop 2 . filter (/= '_') . show $ pack x) ++ "\n") ++)
 
 createRomFile
   :: BitPack a
   => FilePath
   -> [a]
-  -> IO Int
+  -> IO ()
 createRomFile file es =
-  let ss = map (drop 2 . filter (/= '_') . show . pack) es
-  in writeFile file (unlines ss) >> return (length ss)
+  writeFile file (foldr showsBitPackFile "" es)
 
 romDataFromFile
   :: BitPack a
   => FilePath
   -> [a]
   -> ExpQ
-romDataFromFile file es = do
-  len <- qRunIO (createRomFile file es)
-  tupE [ appTypeE (conE 'SNat) (litT . numTyLit $ toInteger len)
-       , litE $ stringL file
-       ]
-
-addDone
-  :: [a]
-  -> [(Bool, a)]
-addDone [e]    = [(True, e)]
-addDone (e:es) = (False, e):addDone es
-addDone []     = []
+romDataFromFile file es =
+  qRunIO (createRomFile file es)
+  >> tupE [ appTypeE (conE 'SNat) (litT . numTyLit . toInteger $ length es)
+          , litE $ stringL file
+          ]
 
 delayOutput
   :: Int
@@ -51,7 +51,7 @@ addFloatBasicSamples
   :: [(Float, Float, Float)]
 
 addFloatBasicSamples =
-  delayOutput 12 $
+  delayOutput (natToNum @AddFloatDefDelay) $
   [ (1, 4, 5)
   , (2, 5, 7)
   , (3, 6, 9)

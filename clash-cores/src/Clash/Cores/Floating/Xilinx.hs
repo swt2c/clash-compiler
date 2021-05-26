@@ -1,8 +1,4 @@
-module Clash.Cores.Floating.Xilinx
-  ( module Clash.Cores.Floating.Xilinx
-  , module Clash.Cores.Floating.Xilinx.Internal
-  )
-where
+module Clash.Cores.Floating.Xilinx where
 
 import           Clash.Prelude
 
@@ -45,13 +41,15 @@ addFloat
 addFloat cfg = hideEnable $ hideClock $ addFloat# cfg
 {-# INLINE addFloat #-}
 
+type AddFloatDefDelay = 12
+
 addFloat'
   :: ( HiddenClock dom
      , HiddenEnable dom
      )
   => DSignal dom n Float
   -> DSignal dom n Float
-  -> DSignal dom (n + 12) Float
+  -> DSignal dom (n + AddFloatDefDelay) Float
 addFloat' = addFloat defFloatingC
 {-# INLINE addFloat' #-}
 

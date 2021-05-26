@@ -60,7 +60,8 @@ addFloat#
   -> DSignal dom n Float
   -> DSignal dom (n + d) Float
 addFloat# !_ clk en (conditionFloatF -> x) (conditionFloatF -> y) =
-  delayI undefined en clk . conditionFloatF $ x + y
+  let d = delayI (deepErrorX "Initial values of addFloat undefined") en clk
+  in d . conditionFloatF $ x + y
 
 {- Note: BlackBox template includes ~DEVNULL[~LIT[2]] which will ensure
  - ...BlackBoxes.addFloatTclTF gets a fully evaluated FloatingConfig.
