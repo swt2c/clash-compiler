@@ -62,6 +62,31 @@ playSampleRom clk rst n file = (done, out)
   cnt = CEP.register clk rst enableGen 0 $ satSucc SatBound <$> cnt
 
 basicTB
+  :: forall n d
+   . ( KnownNat n
+     , KnownNat d
+     )
+  => (   Clock XilinxSystem
+      -> DSignal XilinxSystem 0 Float
+      -> DSignal XilinxSystem 0 Float
+      -> DSignal XilinxSystem d Float
+     )
+  -> Vec n (Float, Float, Float)
+  -> Signal XilinxSystem Bool
+basicTB comp samples = done
+  where
+    (inputX, inputY, expectedOutput) = unzip3 samples
+    testInputX = fromSignal $ stimuliGenerator clk rst inputX
+    testInputY = fromSignal $ stimuliGenerator clk rst inputY
+    expectOutput = outputVerifier' clk rst (repeat @d 0 ++ expectedOutput)
+    done = expectOutput $ ignoreFor clk rst en (SNat @d) 0
+      $ toSignal $ comp clk testInputX testInputY
+    clk = tbClockGen @XilinxSystem (not <$> done)
+    rst = resetGen @XilinxSystem
+    en = enableGen
+{-# INLINE basicTB #-}
+
+basicRomTB
   :: forall d n
    . ( KnownNat n
      , KnownNat d
@@ -75,25 +100,25 @@ basicTB
   -> SNat n
   -> FilePath
   -> Signal XilinxSystem Bool
-basicTB comp n sampleFile = done
+basicRomTB comp n sampleFile = done
   where
     (done0, samples) = playSampleRom clk rst n sampleFile
     (inputX, inputY, expectedOutput) = unbundle samples
     -- Only assert while not finished
     done = mux done0 done0
-      $ assert clk rst "basicTB" out (fmap FloatVerifier expectedOutput) done0
+      $ assert clk rst "basicRomTB" out (fmap FloatVerifier expectedOutput) done0
     out = fmap FloatVerifier $ ignoreFor clk rst en (SNat @d) 0
       $ toSignal $ comp clk (fromSignal inputX) (fromSignal inputY)
     clk = tbClockGen @XilinxSystem (not <$> done)
     rst = resetGen @XilinxSystem
     en = enableGen
-{-# INLINE basicTB #-}
+{-# INLINE basicRomTB #-}
 
 addFloatBasic
   :: Clock XilinxSystem
   -> DSignal XilinxSystem 0 Float
   -> DSignal XilinxSystem 0 Float
-  -> DSignal XilinxSystem 12 Float
+  -> DSignal XilinxSystem AddFloatDefDelay Float
 addFloatBasic clk x y
   = withClock clk $ withEnable enableGen $ addFloat' x y
 {-# NOINLINE addFloatBasic #-}
@@ -101,7 +126,7 @@ addFloatBasic clk x y
 
 addFloatBasicTB :: Signal XilinxSystem Bool
 addFloatBasicTB =
-  uncurry (basicTB addFloatBasic)
+  uncurry (basicRomTB addFloatBasic)
           $(romDataFromFile "samplerom.bin" addFloatBasicSamples)
 {-# ANN addFloatBasicTB (TestBench 'addFloatBasic) #-}
 
@@ -120,7 +145,7 @@ addFloatEnableTB :: Signal XilinxSystem Bool
 addFloatEnableTB = done
  where
   testInput =
-    fromSignal $ stimuliGenerator clk rst $ $(listToVecTH [1 :: Float .. 30])
+    fromSignal $ stimuliGenerator clk rst $ $(listToVecTH [1 :: Float .. 25])
   en =
     toEnable $ stimuliGenerator clk rst
         (   (replicate d12 True ++ replicate d4 True ++ replicate d4 False)
@@ -135,7 +160,7 @@ addFloatEnableTB = done
            P.++ P.take 12 [5 .. 30]
            -- We "lose" four samples of what remains due to not being enabled
            -- for those inputs.
-           P.++ P.drop 4 (P.drop 12 [5 .. 30])
+           P.++ P.drop 4 (P.drop 12 [5 .. 25])
         )
   expectOutput =
     outputVerifier' clk rst expectedOutput
@@ -144,3 +169,22 @@ addFloatEnableTB = done
   clk = tbClockGen @XilinxSystem (not <$> done)
   rst = resetGen @XilinxSystem
 {-# ANN addFloatEnableTB (TestBench 'addFloatEnable) #-}
+
+addFloatShortPL
+  :: Clock XilinxSystem
+  -> DSignal XilinxSystem 0 Float
+  -> DSignal XilinxSystem 0 Float
+  -> DSignal XilinxSystem 6 Float
+addFloatShortPL clk x y
+  = withClock clk $ withEnable enableGen $ addFloat defFloatingC x y
+{-# NOINLINE addFloatShortPL #-}
+{-# ANN addFloatShortPL (binTopAnn "addFloatShortPL") #-}
+
+addFloatShortPLTB :: Signal XilinxSystem Bool
+addFloatShortPLTB =
+  basicTB addFloatShortPL
+    $(listToVecTH [ (1, 4, 5) :: (Float, Float, Float)
+                  , (2, 5, 7)
+                  , (3, 6, 9)
+                  ])
+{-# ANN addFloatShortPLTB (TestBench 'addFloatShortPL) #-}

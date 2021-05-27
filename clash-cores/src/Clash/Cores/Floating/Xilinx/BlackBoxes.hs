@@ -5,18 +5,18 @@ where
 
 import           Prelude
 
-import           Clash.Backend
--- import           Clash.Netlist.BlackBox.Util
--- import qualified Clash.Netlist.Id                as Id
-import           Clash.Netlist.Types
--- import           Clash.Netlist.Util
-import           Control.Monad.State             (State())
--- import           Data.Semigroup.Monad            (getMon)
-import           Data.String                     (fromString)
-import           Data.String.Interpolate.IsString (i)
-import           Data.String.Interpolate.Util    (unindent)
--- import           Data.Text                       as TextS
-import           Data.Text.Prettyprint.Doc.Extra
+import Clash.Backend
+-- import Clash.Netlist.BlackBox.Util
+-- import qualified Clash.Netlist.Id as Id
+import Clash.Netlist.Types
+-- import Clash.Netlist.Util
+import Control.Monad.State (State())
+-- import Data.Semigroup.Monad (getMon)
+import Data.String (fromString)
+import Data.String.Interpolate (i)
+import Data.String.Interpolate.Util (unindent)
+-- import Data.Text as TextS
+import Data.Text.Prettyprint.Doc.Extra
 
 addFloatTclTF :: TemplateFunction
 addFloatTclTF = addSubFloatTclTF "Add"
@@ -46,7 +46,7 @@ addSubFloatTclTemplate addSubVal bbCtx = pure bbText
   (DataCon _ _ cfgExprs, _, _) = bbInputs bbCtx !! 2
   cfgArchOptExpr = cfgExprs !! 0
   cfgDspUsageExpr = cfgExprs !! 1
-  -- cfgBMemUsageExpr = cfgExprs !! 2
+  -- cfgBMemUsageExpr = cfgExprs !! 2 -- TODO
 
   DataCon _ (DC (Sum _ cfgArchOptConstrs, cfgArchOptTag)) _ = cfgArchOptExpr
   cfgArchOpt = cfgArchOptConstrs !! cfgArchOptTag
@@ -63,8 +63,8 @@ addSubFloatTclTemplate addSubVal bbCtx = pure bbText
   tclDspUsage =
     case cfgDspUsage of
       "Clash.Cores.Floating.Xilinx.Internal.NoDspUsage" -> "No_Usage"
-      "Clash.Cores.Floating.Xilinx.Internal.MediumDspUsage" -> undefined
-      "Clash.Cores.Floating.Xilinx.Internal.FullDspUsage" -> undefined
+      "Clash.Cores.Floating.Xilinx.Internal.MediumDspUsage" -> undefined -- TODO
+      "Clash.Cores.Floating.Xilinx.Internal.FullDspUsage" -> undefined -- TODO
       _ -> error "Unknown FloatingDspUsage constructor"
 
   -- Literal Nothing (BoolLit cfgBMemUsage) = cfgBMemUsageExpr
@@ -84,6 +84,7 @@ addSubFloatTclTemplate addSubVal bbCtx = pure bbText
                              CONFIG.Flow_Control NonBlocking \\
                              CONFIG.Has_ACLKEN #{tclClkEn} \\
                              CONFIG.Has_RESULT_TREADY false \\
+                             CONFIG.Maximum_Latency false \\
                              CONFIG.C_Latency #{latency}] \\
                        [get_ips {#{compName}}]
     generate_target {synthesis simulation} [get_ips {#{compName}}]
