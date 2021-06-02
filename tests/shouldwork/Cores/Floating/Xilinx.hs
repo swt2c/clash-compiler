@@ -1,4 +1,3 @@
-{-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 module Xilinx where
 
@@ -61,7 +60,7 @@ playSampleRom clk rst n file = (done, out)
   cnt :: Signal dom (Index n)
   cnt = CEP.register clk rst enableGen 0 $ satSucc SatBound <$> cnt
 
-basicTB
+basicBinaryTB
   :: forall n d
    . ( KnownNat n
      , KnownNat d
@@ -73,7 +72,7 @@ basicTB
      )
   -> Vec n (Float, Float, Float)
   -> Signal XilinxSystem Bool
-basicTB comp samples = done
+basicBinaryTB comp samples = done
   where
     (inputX, inputY, expectedOutput) = unzip3 samples
     testInputX = fromSignal $ stimuliGenerator clk rst inputX
@@ -84,7 +83,7 @@ basicTB comp samples = done
     clk = tbClockGen @XilinxSystem (not <$> done)
     rst = resetGen @XilinxSystem
     en = enableGen
-{-# INLINE basicTB #-}
+{-# INLINE basicBinaryTB #-}
 
 basicRomTB
   :: forall d n
@@ -114,6 +113,29 @@ basicRomTB comp n sampleFile = done
     en = enableGen
 {-# INLINE basicRomTB #-}
 
+basicUnaryTB
+  :: forall n d
+   . ( KnownNat n
+     , KnownNat d
+     )
+  => (   Clock XilinxSystem
+      -> DSignal XilinxSystem 0 Float
+      -> DSignal XilinxSystem d Float
+     )
+  -> Vec n (Float, Float)
+  -> Signal XilinxSystem Bool
+basicUnaryTB comp samples = done
+  where
+    (input, expectedOutput) = unzip samples
+    testInput = fromSignal $ stimuliGenerator clk rst input
+    expectOutput = outputVerifier' clk rst (repeat @d 0 ++ expectedOutput)
+    done = expectOutput $ ignoreFor clk rst en (SNat @d) 0
+      $ toSignal $ comp clk testInput
+    clk = tbClockGen @XilinxSystem (not <$> done)
+    rst = resetGen @XilinxSystem
+    en = enableGen
+{-# INLINE basicUnaryTB #-}
+
 addFloatBasic
   :: Clock XilinxSystem
   -> DSignal XilinxSystem 0 Float
@@ -135,7 +157,7 @@ addFloatEnable
   -> Enable XilinxSystem
   -> DSignal XilinxSystem 0 Float
   -> DSignal XilinxSystem 0 Float
-  -> DSignal XilinxSystem 12 Float
+  -> DSignal XilinxSystem 11 Float
 addFloatEnable clk en x y
   = withClock clk $ withEnable en $ addFloat' x y
 {-# NOINLINE addFloatEnable #-}
@@ -148,23 +170,23 @@ addFloatEnableTB = done
     fromSignal $ stimuliGenerator clk rst $ $(listToVecTH [1 :: Float .. 25])
   en =
     toEnable $ stimuliGenerator clk rst
-        (   (replicate d12 True ++ replicate d4 True ++ replicate d4 False)
+        (   (replicate d11 True ++ replicate d4 True ++ replicate d4 False)
          :< True)
   expectedOutput =
-       replicate d12 0
+       replicate d11 0
     ++ $(listToVecTH . P.map (\i -> i + i) $
                 [1 :: Float .. 4]
            -- Stall for four cycles
            P.++ P.replicate 4 5
-           -- Still in the pipeline (12 deep) from before the stall.
-           P.++ P.take 12 [5 .. 30]
+           -- Still in the pipeline (11 deep) from before the stall.
+           P.++ P.take 11 [5 .. 30]
            -- We "lose" four samples of what remains due to not being enabled
            -- for those inputs.
-           P.++ P.drop 4 (P.drop 12 [5 .. 25])
+           P.++ P.drop 4 (P.drop 11 [5 .. 25])
         )
   expectOutput =
     outputVerifier' clk rst expectedOutput
-  done = expectOutput $ ignoreFor clk rst enableGen d12 0
+  done = expectOutput $ ignoreFor clk rst enableGen d11 0
     $ toSignal $ addFloatEnable clk en testInput testInput
   clk = tbClockGen @XilinxSystem (not <$> done)
   rst = resetGen @XilinxSystem
@@ -182,9 +204,84 @@ addFloatShortPL clk x y
 
 addFloatShortPLTB :: Signal XilinxSystem Bool
 addFloatShortPLTB =
-  basicTB addFloatShortPL
+  basicBinaryTB addFloatShortPL
     $(listToVecTH [ (1, 4, 5) :: (Float, Float, Float)
                   , (2, 5, 7)
                   , (3, 6, 9)
                   ])
 {-# ANN addFloatShortPLTB (TestBench 'addFloatShortPL) #-}
+
+subFloatBasic
+  :: Clock XilinxSystem
+  -> DSignal XilinxSystem 0 Float
+  -> DSignal XilinxSystem 0 Float
+  -> DSignal XilinxSystem SubFloatDefDelay Float
+subFloatBasic clk x y
+  = withClock clk $ withEnable enableGen $ subFloat' x y
+{-# NOINLINE subFloatBasic #-}
+{-# ANN subFloatBasic (binTopAnn "subFloatBasic") #-}
+
+subFloatBasicTB :: Signal XilinxSystem Bool
+subFloatBasicTB =
+  basicBinaryTB subFloatBasic
+    $(listToVecTH [ (1, 6, -5) :: (Float, Float, Float)
+                  , (2, 5, -3)
+                  , (3, 4, -1)
+                  ])
+{-# ANN subFloatBasicTB (TestBench 'subFloatBasic) #-}
+
+mulFloatBasic
+  :: Clock XilinxSystem
+  -> DSignal XilinxSystem 0 Float
+  -> DSignal XilinxSystem 0 Float
+  -> DSignal XilinxSystem MulFloatDefDelay Float
+mulFloatBasic clk x y
+  = withClock clk $ withEnable enableGen $ mulFloat' x y
+{-# NOINLINE mulFloatBasic #-}
+{-# ANN mulFloatBasic (binTopAnn "mulFloatBasic") #-}
+
+mulFloatBasicTB :: Signal XilinxSystem Bool
+mulFloatBasicTB =
+  basicBinaryTB mulFloatBasic
+    $(listToVecTH [ (1, 4, 4) :: (Float, Float, Float)
+                  , (2, 5, 10)
+                  , (3, 6, 18)
+                  ])
+{-# ANN mulFloatBasicTB (TestBench 'mulFloatBasic) #-}
+
+divFloatBasic
+  :: Clock XilinxSystem
+  -> DSignal XilinxSystem 0 Float
+  -> DSignal XilinxSystem 0 Float
+  -> DSignal XilinxSystem DivFloatDefDelay Float
+divFloatBasic clk x y
+  = withClock clk $ withEnable enableGen $ divFloat' x y
+{-# NOINLINE divFloatBasic #-}
+{-# ANN divFloatBasic (binTopAnn "divFloatBasic") #-}
+
+divFloatBasicTB :: Signal XilinxSystem Bool
+divFloatBasicTB =
+  basicBinaryTB divFloatBasic
+    $(listToVecTH [ (1, 4, 0.25) :: (Float, Float, Float)
+                  , (2, 5, 0.4)
+                  , (3, 6, 0.5)
+                  ])
+{-# ANN divFloatBasicTB (TestBench 'divFloatBasic) #-}
+
+expFloatBasic
+  :: Clock XilinxSystem
+  -> DSignal XilinxSystem 0 Float
+  -> DSignal XilinxSystem ExpFloatDefDelay Float
+expFloatBasic clk x
+  = withClock clk $ withEnable enableGen $ expFloat' x
+{-# NOINLINE expFloatBasic #-}
+{-# ANN expFloatBasic (unTopAnn "expFloatBasic") #-}
+
+expFloatBasicTB :: Signal XilinxSystem Bool
+expFloatBasicTB =
+  basicUnaryTB expFloatBasic
+    $(listToVecTH [ (1, exp 1) :: (Float, Float)
+                  , (2, exp 2)
+                  , (3, exp 3)
+                  ])
+{-# ANN expFloatBasicTB (TestBench 'expFloatBasic) #-}

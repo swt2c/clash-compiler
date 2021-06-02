@@ -19,26 +19,46 @@ import Data.String.Interpolate.Util (unindent)
 import Data.Text.Prettyprint.Doc.Extra
 
 addFloatTclTF :: TemplateFunction
-addFloatTclTF = addSubFloatTclTF "Add"
+addFloatTclTF = binaryFloatTclTF "Add_Subtract" "Add"
 
 subFloatTclTF :: TemplateFunction
-subFloatTclTF = addSubFloatTclTF "Subtract"
+subFloatTclTF = binaryFloatTclTF "Add_Subtract" "Subtract"
 
-addSubFloatTclTF
+mulFloatTclTF :: TemplateFunction
+mulFloatTclTF = binaryFloatTclTF "Multiply" "Both"
+
+divFloatTclTF :: TemplateFunction
+divFloatTclTF = binaryFloatTclTF "Divide" "Both"
+
+expFloatTclTF :: TemplateFunction
+expFloatTclTF = unaryFloatTclTF "Exponential"
+
+binaryFloatTclTF
   :: String
+  -> String
   -> TemplateFunction
-addSubFloatTclTF addSubVal =
-  TemplateFunction used valid (addSubFloatTclTemplate addSubVal)
+binaryFloatTclTF operType addSubVal =
+  TemplateFunction used valid (floatTclTemplate operType addSubVal)
  where
   used = [0..4]
   valid = const True
 
-addSubFloatTclTemplate
+unaryFloatTclTF
+  :: String
+  -> TemplateFunction
+unaryFloatTclTF operType =
+  TemplateFunction used valid (floatTclTemplate operType "Both")
+ where
+  used = [0..3]
+  valid = const True
+
+floatTclTemplate
   :: Backend s
   => String
+  -> String
   -> BlackBoxContext
   -> State s Doc
-addSubFloatTclTemplate addSubVal bbCtx = pure bbText
+floatTclTemplate operType addSubVal bbCtx = pure bbText
  where
   compName = bbQsysIncName bbCtx !! 0
 
@@ -46,7 +66,7 @@ addSubFloatTclTemplate addSubVal bbCtx = pure bbText
   (DataCon _ _ cfgExprs, _, _) = bbInputs bbCtx !! 2
   cfgArchOptExpr = cfgExprs !! 0
   cfgDspUsageExpr = cfgExprs !! 1
-  -- cfgBMemUsageExpr = cfgExprs !! 2 -- TODO
+  cfgBMemUsageExpr = cfgExprs !! 2
 
   DataCon _ (DC (Sum _ cfgArchOptConstrs, cfgArchOptTag)) _ = cfgArchOptExpr
   cfgArchOpt = cfgArchOptConstrs !! cfgArchOptTag
@@ -63,11 +83,15 @@ addSubFloatTclTemplate addSubVal bbCtx = pure bbText
   tclDspUsage =
     case cfgDspUsage of
       "Clash.Cores.Floating.Xilinx.Internal.NoDspUsage" -> "No_Usage"
-      "Clash.Cores.Floating.Xilinx.Internal.MediumDspUsage" -> undefined -- TODO
-      "Clash.Cores.Floating.Xilinx.Internal.FullDspUsage" -> undefined -- TODO
+      "Clash.Cores.Floating.Xilinx.Internal.MediumDspUsage" -> "Medium_Usage"
+      "Clash.Cores.Floating.Xilinx.Internal.FullDspUsage" -> "Full_Usage"
+      "Clash.Cores.Floating.Xilinx.Internal.MaxDspUsage" -> "Max_Usage"
       _ -> error "Unknown FloatingDspUsage constructor"
 
-  -- Literal Nothing (BoolLit cfgBMemUsage) = cfgBMemUsageExpr
+  Literal Nothing (BoolLit cfgBMemUsage) = cfgBMemUsageExpr
+  tclBMemUsage :: String
+  tclBMemUsage | cfgBMemUsage = "Full_Usage"
+               | otherwise    = "No_Usage"
 
   tclClkEn :: String
   tclClkEn =
@@ -78,9 +102,11 @@ addSubFloatTclTemplate addSubVal bbCtx = pure bbText
   bbText = fromString $ unindent [i|
     create_ip -name floating_point -vendor xilinx.com -library ip \\
               -version 7.1 -module_name {#{compName}}
-    set_property -dict [list CONFIG.Add_Sub_Value #{addSubVal} \\
+    set_property -dict [list CONFIG.Operation_Type #{operType} \\
+                             CONFIG.Add_Sub_Value #{addSubVal} \\
                              CONFIG.C_Optimization #{tclArchOpt} \\
                              CONFIG.C_Mult_Usage #{tclDspUsage} \\
+                             CONFIG.C_BRAM_Usage #{tclBMemUsage} \\
                              CONFIG.Flow_Control NonBlocking \\
                              CONFIG.Has_ACLKEN #{tclClkEn} \\
                              CONFIG.Has_RESULT_TREADY false \\

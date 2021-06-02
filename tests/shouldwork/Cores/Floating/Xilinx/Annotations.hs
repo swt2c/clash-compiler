@@ -26,3 +26,14 @@ binEnTopAnn name =
           ]
     , t_output = PortName "result"
     }
+
+unTopAnn :: String -> TopEntity
+unTopAnn name =
+  Synthesize
+    { t_name   = name
+    , t_inputs =
+          [ PortName "clk"
+          , PortName "x"
+          ]
+    , t_output = PortName "result"
+    }

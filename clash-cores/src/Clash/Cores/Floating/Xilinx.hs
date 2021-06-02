@@ -1,4 +1,28 @@
-module Clash.Cores.Floating.Xilinx where
+module Clash.Cores.Floating.Xilinx
+  ( absFloat
+  , addFloat
+  , addFloat'
+  , AddFloatDefDelay
+  , copySignFloat
+  , defFloatingC
+  , divFloat
+  , divFloat'
+  , DivFloatDefDelay
+  , expFloat
+  , expFloat'
+  , ExpFloatDefDelay
+  , fixedToFloat
+  , FloatingConfig(..)
+  , floatToFixed
+  , fmaFloat
+  , mulFloat
+  , mulFloat'
+  , MulFloatDefDelay
+  , negateFloat
+  , subFloat
+  , subFloat'
+  , SubFloatDefDelay
+  ) where
 
 import           Clash.Prelude
 
@@ -7,7 +31,7 @@ import           Clash.Cores.Floating.Xilinx.Internal
 defFloatingC :: FloatingConfig
 defFloatingC = FloatingConfig
   { floatingArchOpt = SpeedArch
-  , floatingDspUsage = NoDspUsage
+  , floatingDspUsage = FullDspUsage
   , floatingBMemUsage = False
   }
 
@@ -29,8 +53,7 @@ copySignFloat x y = unpack $     pack x .&. (-1) `shiftR` 1
                              .|. pack y .&. 1 `shiftL` 31
 
 addFloat
-  :: forall d dom n
-   . ( HiddenClock dom
+  :: ( HiddenClock dom
      , HiddenEnable dom
      , KnownNat d
      )
@@ -41,7 +64,7 @@ addFloat
 addFloat cfg = hideEnable $ hideClock $ addFloat# cfg
 {-# INLINE addFloat #-}
 
-type AddFloatDefDelay = 12
+type AddFloatDefDelay = 11
 
 addFloat'
   :: ( HiddenClock dom
@@ -53,15 +76,77 @@ addFloat'
 addFloat' = addFloat defFloatingC
 {-# INLINE addFloat' #-}
 
+subFloat
+  :: ( HiddenClock dom
+     , HiddenEnable dom
+     , KnownNat d
+     )
+  => FloatingConfig
+  -> DSignal dom n Float
+  -> DSignal dom n Float
+  -> DSignal dom (n + d) Float
+subFloat cfg = hideEnable $ hideClock $ subFloat# cfg
+{-# INLINE subFloat #-}
+
+type SubFloatDefDelay = 11
+
+subFloat'
+  :: ( HiddenClock dom
+     , HiddenEnable dom
+     )
+  => DSignal dom n Float
+  -> DSignal dom n Float
+  -> DSignal dom (n + SubFloatDefDelay) Float
+subFloat' = subFloat defFloatingC
+{-# INLINE subFloat' #-}
+
+mulFloat
+  :: ( HiddenClock dom
+     , HiddenEnable dom
+     , KnownNat d
+     )
+  => FloatingConfig
+  -> DSignal dom n Float
+  -> DSignal dom n Float
+  -> DSignal dom (n + d) Float
+mulFloat cfg = hideEnable $ hideClock $ mulFloat# cfg
+{-# INLINE mulFloat #-}
+
+type MulFloatDefDelay = 8
+
+mulFloat'
+  :: ( HiddenClock dom
+     , HiddenEnable dom
+     )
+  => DSignal dom n Float
+  -> DSignal dom n Float
+  -> DSignal dom (n + MulFloatDefDelay) Float
+mulFloat' = mulFloat defFloatingC
+{-# INLINE mulFloat' #-}
+
 divFloat
   :: ( HiddenClock dom
      , HiddenEnable dom
      , KnownNat d
      )
-  => DSignal dom n Float
+  => FloatingConfig
+  -> DSignal dom n Float
   -> DSignal dom n Float
   -> DSignal dom (n + d) Float
-divFloat = undefined
+divFloat cfg = hideEnable $ hideClock $ divFloat# cfg
+{-# INLINE divFloat #-}
+
+type DivFloatDefDelay = 28
+
+divFloat'
+  :: ( HiddenClock dom
+     , HiddenEnable dom
+     )
+  => DSignal dom n Float
+  -> DSignal dom n Float
+  -> DSignal dom (n + DivFloatDefDelay) Float
+divFloat' = divFloat defFloatingC
+{-# INLINE divFloat' #-}
 
 expFloat
   :: ( HiddenClock dom
@@ -71,7 +156,17 @@ expFloat
   => FloatingConfig
   -> DSignal dom n Float
   -> DSignal dom (n + d) Float
-expFloat = undefined
+expFloat cfg = hideEnable $ hideClock $ expFloat# cfg
+
+type ExpFloatDefDelay = 20
+
+expFloat'
+  :: ( HiddenClock dom
+     , HiddenEnable dom
+     )
+  => DSignal dom n Float
+  -> DSignal dom (n + ExpFloatDefDelay) Float
+expFloat' = expFloat defFloatingC
 
 fixedToFloat
   :: ( HiddenClock dom
