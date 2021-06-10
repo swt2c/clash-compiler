@@ -630,6 +630,7 @@ runClashTest = defaultMain $ clashTestRoot
         , runTest "BlockRamFile" def
         , runTest "BlockRam0" def
         , runTest "BlockRam1" def
+        , runTest "AndEnable" def
         , runTest "Ram" def
         , runTest "ResetGen" def
         , runTest "RomFile" def

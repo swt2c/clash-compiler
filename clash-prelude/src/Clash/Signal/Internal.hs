@@ -391,8 +391,9 @@ class KnownSymbol dom => KnownDomain (dom :: Domain) where
   -- | Returns 'SDomainConfiguration' corresponding to an instance's 'DomainConfiguration'.
   --
   -- Example usage:
-  -- > knownDomain @System
   --
+  -- >>> knownDomain @System
+  -- SDomainConfiguration (SSymbol @"System") (SNat @10000) SRising SAsynchronous SDefined SActiveHigh
   knownDomain :: SDomainConfiguration dom (KnownConf dom)
 
 -- | Version of 'knownDomain' that takes a 'SSymbol'. For example:
@@ -425,7 +426,7 @@ instance KnownDomain IntelSystem where
 
 -- | Convenience value to allow easy "subclassing" of System domain. Should
 -- be used in combination with 'createDomain'. For example, if you just want to
--- change the period but leave all other settings in tact use:
+-- change the period but leave all other settings intact use:
 --
 -- > createDomain vSystem{vName="System10", vPeriod=10}
 --
@@ -443,7 +444,7 @@ type System = ("System" :: Domain)
 
 -- | Convenience value to allow easy "subclassing" of IntelSystem domain. Should
 -- be used in combination with 'createDomain'. For example, if you just want to
--- change the period but leave all other settings in tact use:
+-- change the period but leave all other settings intact use:
 --
 -- > createDomain vIntelSystem{vName="Intel10", vPeriod=10}
 --
@@ -460,7 +461,7 @@ type IntelSystem = ("IntelSystem" :: Domain)
 
 -- | Convenience value to allow easy "subclassing" of XilinxSystem domain. Should
 -- be used in combination with 'createDomain'. For example, if you just want to
--- change the period but leave all other settings in tact use:
+-- change the period but leave all other settings intact use:
 --
 -- > createDomain vXilinxSystem{vName="Xilinx10", vPeriod=10}
 --
