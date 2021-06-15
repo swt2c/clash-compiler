@@ -11,17 +11,33 @@ import Clash.Annotations.Primitive
 
 import Clash.Cores.Floating.Xilinx.TH
 
+-- | Customize Xilinx floating point IP.
+--
+-- These customizations influence how the IP will be synthesized. It does not
+-- affect behavior.
 data FloatingConfig = FloatingConfig
   { floatingArchOpt :: !FloatingArchOpt
+    -- ^ Architecture optimisations
   , floatingDspUsage :: !FloatingDspUsage
+    -- ^ DSP slice usage
   , floatingBMemUsage :: !Bool
+    -- ^ Use block memory for exponential function
   } deriving (Eq, Show)
 
+-- | Architecture optimizations.
+--
+-- For those operations that support different architecture optimizations.
 data FloatingArchOpt
   = SpeedArch
+    -- ^ Speed-optimized architecture
   | LatencyArch
+    -- ^ Low latency architecture
   deriving (Eq, Show)
 
+-- | DSP slice usage.
+--
+-- For those operations that can use DSP slices. Not all such operations support
+-- all variants.
 data FloatingDspUsage
   = NoDspUsage
   | MediumDspUsage

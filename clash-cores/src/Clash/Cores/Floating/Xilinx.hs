@@ -14,12 +14,15 @@ create the proper entity.
 Most functions allow customization of the Xilinx IP. Valid combinations will
 need to be gleaned from, e.g., the Vivado wizard (IP Catalog -> Floating-point).
 All IP instantiated by this module always have the following properties:
+
 * Single precision
 * Non-blocking
 * No reset input
 * No optional output fields, no @TLAST@, no @TUSER@.
 * @TVALID@ on the inputs is always asserted, @TVALID@ on the output is ignored.
-Note that it would appear the Xilinx IP does not use these signals anyway.
+Note that it would appear the Xilinx IP does not use these signals in non-blocking mode anyway.
+* 1 cycle per operation (meaning there need not be any dummy cycles between
+consecutive inputs)
 
 The latency of the IP is set through the delay argument of the 'DSignal'. Other
 customization is done through the 'FloatingConfig' argument of customizable
@@ -31,7 +34,13 @@ The Xilinx IP does not support calculations with subnormal numbers. All
 subnormal numbers are rounded to zero on both input and output. Note that this
 introduces a slight bias as the larger subnormal numbers are closer to the
 smallest normal number, but they are rounded to zero nonetheless!
+
+For each customizable operation, there also exists a function that uses the
+defaults. These functions use the settings from 'defFloatingC' and the maximum
+delay for the Xilinx IP with that configuration. That delay is also defined as
+a type variable for delay annotation in circuits.
 -}
+
 module Clash.Cores.Floating.Xilinx
   ( absFloat
   , addFloat
@@ -56,12 +65,21 @@ module Clash.Cores.Floating.Xilinx
   , subFloat
   , subFloat'
   , SubFloatDefDelay
+  , xilinxIsNaN
+  , xilinxIsInf
   ) where
 
 import           Clash.Prelude
 
 import           Clash.Cores.Floating.Xilinx.Internal
 
+-- | Default customization options.
+--
+-- For those operations that support it, the default options are:
+--
+-- * Speed-optimized architecture ('SpeedArch').
+-- * Full DSP slice usage ('FullDspUsage').
+-- * Exponential operator does not use block memory.
 defFloatingC :: FloatingConfig
 defFloatingC = FloatingConfig
   { floatingArchOpt = SpeedArch
@@ -86,6 +104,7 @@ copySignFloat
 copySignFloat x y = unpack $     pack x .&. (-1) `shiftR` 1
                              .|. pack y .&. 1 `shiftL` 31
 
+-- | Floating point addition.
 addFloat
   :: ( HiddenClock dom
      , HiddenEnable dom
@@ -98,8 +117,10 @@ addFloat
 addFloat cfg = hideEnable $ hideClock $ addFloat# cfg
 {-# INLINE addFloat #-}
 
+-- | The default delay for floating point addition with default customization.
 type AddFloatDefDelay = 11
 
+-- | Floating point addition with default settings.
 addFloat'
   :: ( HiddenClock dom
      , HiddenEnable dom
@@ -241,3 +262,23 @@ fmaFloat
   -> DSignal dom n Float
   -> DSignal dom (n + d) Float
 fmaFloat = undefined
+
+-- | More efficient version to check a result for NaN.
+--
+-- Since Xilinx IP always generates a specific NaN, it can be tested more
+-- cheaply than a generic operator that correctly distinguishes all valid
+-- transfinite floating point encodings.
+xilinxIsNaN
+  :: Float
+  -> Bool
+xilinxIsNaN = undefined
+
+-- | More efficient version to check a result for infinity.
+--
+-- Since Xilinx IP always generates a specific NaN, infinity can be tested more
+-- cheaply than a generic operator that correctly distinguishes all valid
+-- transfinite floating point encodings.
+xilinxIsInf
+  :: Float
+  -> Bool
+xilinxIsInf = undefined
