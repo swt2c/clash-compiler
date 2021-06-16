@@ -7,11 +7,10 @@ import Data.String.Interpolate (i)
 import Data.String.Interpolate.Util (unindent)
 
 
-{-| The content of an InlinePrimitive, for a binary function in VHDL.
- -
- - Note: The BlackBox template includes ~DEVNULL[~LIT[2]] which will ensure the
- - template function (tclTFName argument) gets a fully evaluated FloatingConfig.
- -}
+-- | The content of an InlinePrimitive, for a binary function in VHDL.
+--
+-- Note: The BlackBox template includes ~DEVNULL[~LIT[2]] which will ensure the
+-- template function (tclTFName argument) gets a fully evaluated FloatingConfig.
 vhdlBinaryPrim
   :: String
   -> String
@@ -77,11 +76,10 @@ vhdlBinaryPrim primName funcName tclTFName = unindent [i|
   ]
   |]
 
-{-| The content of an InlinePrimitive, for a unary function in VHDL.
- -
- - Note: The BlackBox template includes ~DEVNULL[~LIT[2]] which will ensure the
- - template function (tclTFName argument) gets a fully evaluated FloatingConfig.
- -}
+-- | The content of an InlinePrimitive, for a unary function in VHDL.
+--
+-- Note: The BlackBox template includes ~DEVNULL[~LIT[2]] which will ensure the
+-- template function (tclTFName argument) gets a fully evaluated FloatingConfig.
 vhdlUnaryPrim
   :: String
   -> String

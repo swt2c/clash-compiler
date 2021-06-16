@@ -13,7 +13,7 @@ create the proper entity.
 
 Most functions allow customization of the Xilinx IP. Valid combinations will
 need to be gleaned from, e.g., the Vivado wizard (IP Catalog -> Floating-point).
-All IP instantiated by this module always have the following properties:
+All IP instantiated by this module always has the following properties:
 
 * Single precision
 * Non-blocking
@@ -55,7 +55,9 @@ module Clash.Cores.Floating.Xilinx
   , expFloat'
   , ExpFloatDefDelay
   , fixedToFloat
+  , FloatingArchOpt(..)
   , FloatingConfig(..)
+  , FloatingDspUsage(..)
   , floatToFixed
   , fmaFloat
   , mulFloat
@@ -69,9 +71,11 @@ module Clash.Cores.Floating.Xilinx
   , xilinxIsInf
   ) where
 
-import           Clash.Prelude
+import Clash.Prelude
 
-import           Clash.Cores.Floating.Xilinx.Internal
+import GHC.Stack (HasCallStack, withFrozenCallStack)
+
+import Clash.Cores.Floating.Xilinx.Internal
 
 -- | Default customization options.
 --
@@ -109,12 +113,13 @@ addFloat
   :: ( HiddenClock dom
      , HiddenEnable dom
      , KnownNat d
+     , HasCallStack
      )
   => FloatingConfig
   -> DSignal dom n Float
   -> DSignal dom n Float
   -> DSignal dom (n + d) Float
-addFloat cfg = hideEnable $ hideClock $ addFloat# cfg
+addFloat cfg = withFrozenCallStack $ hideEnable . hideClock $ addFloat# cfg
 {-# INLINE addFloat #-}
 
 -- | The default delay for floating point addition with default customization.
@@ -124,11 +129,12 @@ type AddFloatDefDelay = 11
 addFloat'
   :: ( HiddenClock dom
      , HiddenEnable dom
+     , HasCallStack
      )
   => DSignal dom n Float
   -> DSignal dom n Float
   -> DSignal dom (n + AddFloatDefDelay) Float
-addFloat' = addFloat defFloatingC
+addFloat' = withFrozenCallStack $ addFloat defFloatingC
 {-# INLINE addFloat' #-}
 
 subFloat
