@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE QuasiQuotes #-}
+{-# LANGUAGE RecordWildCards #-}
 module Clash.Cores.Floating.Xilinx.BlackBoxes
 where
 
@@ -18,52 +19,76 @@ import Data.String.Interpolate.Util (unindent)
 -- import Data.Text as TextS
 import Data.Text.Prettyprint.Doc.Extra
 
+data HasCustom = HasCustom
+  { addSubVal ::  !(Maybe String)
+  , hasArchOpt :: !Bool
+  , hasDspUsage :: !Bool
+  , hasBMemUsage :: !Bool
+  }
+
+defHasCustom :: HasCustom
+defHasCustom = HasCustom
+  { addSubVal = Nothing
+  , hasArchOpt = True
+  , hasDspUsage = True
+  , hasBMemUsage = False
+  }
+
 addFloatTclTF :: TemplateFunction
-addFloatTclTF = binaryFloatTclTF "Add_Subtract" "Add"
+addFloatTclTF =
+  binaryFloatTclTF (defHasCustom { addSubVal = Just "Add" }) "Add_Subtract"
 
 subFloatTclTF :: TemplateFunction
-subFloatTclTF = binaryFloatTclTF "Add_Subtract" "Subtract"
+subFloatTclTF =
+  binaryFloatTclTF (defHasCustom { addSubVal = Just "Subtract" }) "Add_Subtract"
 
 mulFloatTclTF :: TemplateFunction
-mulFloatTclTF = binaryFloatTclTF "Multiply" "Both"
+mulFloatTclTF = binaryFloatTclTF defHasCustom "Multiply"
 
 divFloatTclTF :: TemplateFunction
-divFloatTclTF = binaryFloatTclTF "Divide" "Both"
+divFloatTclTF = binaryFloatTclTF defHasCustom "Divide"
 
 expFloatTclTF :: TemplateFunction
-expFloatTclTF = unaryFloatTclTF "Exponential"
+expFloatTclTF = unaryFloatTclTF hasCustom "Exponential"
+ where
+  hasCustom = HasCustom { addSubVal = Nothing
+                        , hasArchOpt = False
+                        , hasDspUsage = False
+                        , hasBMemUsage = True
+                        }
 
 binaryFloatTclTF
-  :: String
+  :: HasCustom
   -> String
   -> TemplateFunction
-binaryFloatTclTF operType addSubVal =
-  TemplateFunction used valid (floatTclTemplate operType addSubVal)
+binaryFloatTclTF hasCustom operType =
+  TemplateFunction used valid (floatTclTemplate hasCustom operType)
  where
   used = [0..4]
   valid = const True
 
 unaryFloatTclTF
-  :: String
+  :: HasCustom
+  -> String
   -> TemplateFunction
-unaryFloatTclTF operType =
-  TemplateFunction used valid (floatTclTemplate operType "Both")
+unaryFloatTclTF hasCustom operType =
+  TemplateFunction used valid (floatTclTemplate hasCustom operType)
  where
   used = [0..3]
   valid = const True
 
 floatTclTemplate
   :: Backend s
-  => String
+  => HasCustom
   -> String
   -> BlackBoxContext
   -> State s Doc
-floatTclTemplate operType addSubVal bbCtx = pure bbText
+floatTclTemplate (HasCustom {..}) operType bbCtx = pure bbText
  where
   compName = bbQsysIncName bbCtx !! 0
 
   (Literal _ (NumLit latency), _, _) = bbInputs bbCtx !! 1
-  (DataCon _ _ cfgExprs, _, _) = bbInputs bbCtx !! 2
+  (DataCon _ _ cfgExprs, _, _) = bbInputs bbCtx !! 3
   cfgArchOptExpr = cfgExprs !! 0
   cfgDspUsageExpr = cfgExprs !! 1
   cfgBMemUsageExpr = cfgExprs !! 2
@@ -121,6 +146,17 @@ floatTclTemplate operType addSubVal bbCtx = pure bbText
     Name:
     #{compName}
 
+    bbInputs 0:
+    #{bbInputs bbCtx !! 0}
+
+    bbInputs 1:
+    #{bbInputs bbCtx !! 1}
+
+    bbInputs 2:
+    #{bbInputs bbCtx !! 2}
+
+    bbInputs 3:
+    #{bbInputs bbCtx !! 3}
     Latency:
     #{latency}
 
@@ -149,5 +185,4 @@ floatTclTemplate operType addSubVal bbCtx = pure bbText
 
     bbCtxName:
     #{bbCtxName bbCtx}
-    |]
 -}
