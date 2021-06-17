@@ -141,12 +141,13 @@ subFloat
   :: ( HiddenClock dom
      , HiddenEnable dom
      , KnownNat d
+     , HasCallStack
      )
   => FloatingConfig
   -> DSignal dom n Float
   -> DSignal dom n Float
   -> DSignal dom (n + d) Float
-subFloat cfg = hideEnable $ hideClock $ subFloat# cfg
+subFloat cfg = withFrozenCallStack $ hideEnable . hideClock $ subFloat# cfg
 {-# INLINE subFloat #-}
 
 type SubFloatDefDelay = 11
@@ -154,6 +155,7 @@ type SubFloatDefDelay = 11
 subFloat'
   :: ( HiddenClock dom
      , HiddenEnable dom
+     , HasCallStack
      )
   => DSignal dom n Float
   -> DSignal dom n Float
@@ -165,12 +167,13 @@ mulFloat
   :: ( HiddenClock dom
      , HiddenEnable dom
      , KnownNat d
+     , HasCallStack
      )
   => FloatingConfig
   -> DSignal dom n Float
   -> DSignal dom n Float
   -> DSignal dom (n + d) Float
-mulFloat cfg = hideEnable $ hideClock $ mulFloat# cfg
+mulFloat cfg = withFrozenCallStack $ hideEnable . hideClock $ mulFloat# cfg
 {-# INLINE mulFloat #-}
 
 type MulFloatDefDelay = 8
@@ -178,6 +181,7 @@ type MulFloatDefDelay = 8
 mulFloat'
   :: ( HiddenClock dom
      , HiddenEnable dom
+     , HasCallStack
      )
   => DSignal dom n Float
   -> DSignal dom n Float
@@ -189,12 +193,13 @@ divFloat
   :: ( HiddenClock dom
      , HiddenEnable dom
      , KnownNat d
+     , HasCallStack
      )
   => FloatingConfig
   -> DSignal dom n Float
   -> DSignal dom n Float
   -> DSignal dom (n + d) Float
-divFloat cfg = hideEnable $ hideClock $ divFloat# cfg
+divFloat cfg = withFrozenCallStack $ hideEnable . hideClock $ divFloat# cfg
 {-# INLINE divFloat #-}
 
 type DivFloatDefDelay = 28
@@ -202,6 +207,7 @@ type DivFloatDefDelay = 28
 divFloat'
   :: ( HiddenClock dom
      , HiddenEnable dom
+     , HasCallStack
      )
   => DSignal dom n Float
   -> DSignal dom n Float
@@ -213,17 +219,19 @@ expFloat
   :: ( HiddenClock dom
      , HiddenEnable dom
      , KnownNat d
+     , HasCallStack
      )
   => FloatingConfig
   -> DSignal dom n Float
   -> DSignal dom (n + d) Float
-expFloat cfg = hideEnable $ hideClock $ expFloat# cfg
+expFloat cfg = withFrozenCallStack $ hideEnable . hideClock $ expFloat# cfg
 
 type ExpFloatDefDelay = 20
 
 expFloat'
   :: ( HiddenClock dom
      , HiddenEnable dom
+     , HasCallStack
      )
   => DSignal dom n Float
   -> DSignal dom (n + ExpFloatDefDelay) Float
@@ -238,6 +246,7 @@ fixedToFloat
      , 1 <= int
      , 4 <= (int + frac)
      , (int + frac) <= 64
+     , HasCallStack
      )
   => DSignal dom n (SFixed int frac)
   -> DSignal dom (n + d) Float
@@ -252,6 +261,7 @@ floatToFixed
      , int <= 64
      , KnownNat frac
      , frac <= 32
+     , HasCallStack
      )
   => DSignal dom n Float
   -> DSignal dom (n + d) (SFixed int frac)
@@ -261,6 +271,7 @@ fmaFloat
   :: ( HiddenClock dom
      , HiddenEnable dom
      , KnownNat d
+     , HasCallStack
      )
   => FloatingConfig
   -> DSignal dom n Float

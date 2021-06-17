@@ -4,7 +4,7 @@
 module Clash.Cores.Floating.Xilinx.BlackBoxes
 where
 
-import           Prelude
+import Prelude
 
 import Clash.Backend
 -- import Clash.Netlist.BlackBox.Util
@@ -12,10 +12,11 @@ import Clash.Backend
 import Clash.Netlist.Types
 -- import Clash.Netlist.Util
 import Control.Monad.State (State())
+import Data.Maybe (isJust, fromJust)
 -- import Data.Semigroup.Monad (getMon)
 import Data.String (fromString)
 import Data.String.Interpolate (i)
-import Data.String.Interpolate.Util (unindent)
+-- import Data.String.Interpolate.Util (unindent)
 -- import Data.Text as TextS
 import Data.Text.Prettyprint.Doc.Extra
 
@@ -34,6 +35,15 @@ defHasCustom = HasCustom
   , hasBMemUsage = False
   }
 
+hasNoCustom :: HasCustom
+hasNoCustom = HasCustom
+  { addSubVal = Nothing
+  , hasArchOpt = False
+  , hasDspUsage = False
+  , hasBMemUsage = False
+  }
+
+
 addFloatTclTF :: TemplateFunction
 addFloatTclTF =
   binaryFloatTclTF (defHasCustom { addSubVal = Just "Add" }) "Add_Subtract"
@@ -43,17 +53,23 @@ subFloatTclTF =
   binaryFloatTclTF (defHasCustom { addSubVal = Just "Subtract" }) "Add_Subtract"
 
 mulFloatTclTF :: TemplateFunction
-mulFloatTclTF = binaryFloatTclTF defHasCustom "Multiply"
+mulFloatTclTF = binaryFloatTclTF hasCustom "Multiply"
+ where
+  hasCustom = HasCustom { addSubVal = Nothing
+                        , hasArchOpt = False
+                        , hasDspUsage = True
+                        , hasBMemUsage = False
+                        }
 
 divFloatTclTF :: TemplateFunction
-divFloatTclTF = binaryFloatTclTF defHasCustom "Divide"
+divFloatTclTF = binaryFloatTclTF hasNoCustom "Divide"
 
 expFloatTclTF :: TemplateFunction
 expFloatTclTF = unaryFloatTclTF hasCustom "Exponential"
  where
   hasCustom = HasCustom { addSubVal = Nothing
                         , hasArchOpt = False
-                        , hasDspUsage = False
+                        , hasDspUsage = True
                         , hasBMemUsage = True
                         }
 
@@ -120,26 +136,36 @@ floatTclTemplate (HasCustom {..}) operType bbCtx = pure bbText
 
   tclClkEn :: String
   tclClkEn =
-    case bbInputs bbCtx !! 4 of
+    case bbInputs bbCtx !! 5 of
       (DataCon _ _ [Literal Nothing (BoolLit True)], _, _) -> "false"
       _                                                    -> "true"
 
-  bbText = fromString $ unindent [i|
-    create_ip -name floating_point -vendor xilinx.com -library ip \\
-              -version 7.1 -module_name {#{compName}}
-    set_property -dict [list CONFIG.Operation_Type #{operType} \\
-                             CONFIG.Add_Sub_Value #{addSubVal} \\
-                             CONFIG.C_Optimization #{tclArchOpt} \\
-                             CONFIG.C_Mult_Usage #{tclDspUsage} \\
-                             CONFIG.C_BRAM_Usage #{tclBMemUsage} \\
-                             CONFIG.Flow_Control NonBlocking \\
-                             CONFIG.Has_ACLKEN #{tclClkEn} \\
-                             CONFIG.Has_RESULT_TREADY false \\
-                             CONFIG.Maximum_Latency false \\
-                             CONFIG.C_Latency #{latency}] \\
-                       [get_ips {#{compName}}]
-    generate_target {synthesis simulation} [get_ips {#{compName}}]
-    |]
+  props =
+    foldr prop ""
+      [ (True, "CONFIG.Operation_Type", operType)
+      , (isJust addSubVal, "CONFIG.Add_Sub_Value", fromJust addSubVal)
+      , (hasArchOpt, "CONFIG.C_Optimization", tclArchOpt)
+      , (hasDspUsage, "CONFIG.C_Mult_Usage", tclDspUsage)
+      , (hasBMemUsage, "CONFIG.C_BRAM_Usage", tclBMemUsage)
+      , (True, "CONFIG.Flow_Control", "NonBlocking")
+      , (True, "CONFIG.Has_ACLKEN", tclClkEn)
+      , (True, "CONFIG.Has_RESULT_TREADY", "false")
+      , (True, "CONFIG.Maximum_Latency", "false")
+      , (True, "CONFIG.C_Latency", show latency)
+      ]
+  prop (False, _, _) s = s
+  prop (True, pName, pValue) s =
+    replicate 25 ' ' ++ pName ++ ' ': pValue ++ " \\\n" ++ s
+
+--   bbText = fromString props
+  bbText =
+    fromString [i|create_ip -name floating_point -vendor xilinx.com -library ip \\
+          -version 7.1 -module_name {#{compName}}
+set_property -dict [list \\
+#{props}                   ] \\
+                   [get_ips {#{compName}}]
+generate_target {synthesis simulation} [get_ips {#{compName}}]
+|]
 {-
     Hello world!
 

@@ -101,6 +101,7 @@ subFloat#
   :: forall d dom n
    . ( KnownDomain dom
      , KnownNat d
+     , HasCallStack
      )
   => FloatingConfig
   -> Clock dom
@@ -109,8 +110,9 @@ subFloat#
   -> DSignal dom n Float
   -> DSignal dom (n + d) Float
 subFloat# !_ clk en (conditionFloatF -> x) (conditionFloatF -> y) =
-  let d = delayI (deepErrorX "Initial values of subFloat undefined") en clk
-  in d . conditionFloatF $ x - y
+  delayI und en clk . conditionFloatF $ x - y
+ where
+  und = withFrozenCallStack $ deepErrorX "Initial values of subFloat undefined"
 {-# NOINLINE subFloat# #-}
 {-# ANN subFloat#
       (InlinePrimitive [VHDL] $ vhdlBinaryPrim
@@ -123,6 +125,7 @@ mulFloat#
   :: forall d dom n
    . ( KnownDomain dom
      , KnownNat d
+     , HasCallStack
      )
   => FloatingConfig
   -> Clock dom
@@ -131,8 +134,9 @@ mulFloat#
   -> DSignal dom n Float
   -> DSignal dom (n + d) Float
 mulFloat# !_ clk en (conditionFloatF -> x) (conditionFloatF -> y) =
-  let d = delayI (deepErrorX "Initial values of mulFloat undefined") en clk
-  in d . conditionFloatF $ x * y
+  delayI und en clk . conditionFloatF $ x * y
+ where
+  und = withFrozenCallStack $ deepErrorX "Initial values of mulFloat undefined"
 {-# NOINLINE mulFloat# #-}
 {-# ANN mulFloat#
       (InlinePrimitive [VHDL] $ vhdlBinaryPrim
@@ -145,6 +149,7 @@ divFloat#
   :: forall d dom n
    . ( KnownDomain dom
      , KnownNat d
+     , HasCallStack
      )
   => FloatingConfig
   -> Clock dom
@@ -153,8 +158,9 @@ divFloat#
   -> DSignal dom n Float
   -> DSignal dom (n + d) Float
 divFloat# !_ clk en (conditionFloatF -> x) (conditionFloatF -> y) =
-  let d = delayI (deepErrorX "Initial values of divFloat undefined") en clk
-  in d . conditionFloatF $ x / y
+  delayI und en clk . conditionFloatF $ x / y
+ where
+  und = withFrozenCallStack $ deepErrorX "Initial values of divFloat undefined"
 {-# NOINLINE divFloat# #-}
 {-# ANN divFloat#
       (InlinePrimitive [VHDL] $ vhdlBinaryPrim
@@ -167,6 +173,7 @@ expFloat#
   :: forall d dom n
    . ( KnownDomain dom
      , KnownNat d
+     , HasCallStack
      )
   => FloatingConfig
   -> Clock dom
@@ -174,8 +181,9 @@ expFloat#
   -> DSignal dom n Float
   -> DSignal dom (n + d) Float
 expFloat# !_ clk en (conditionFloatF -> x) =
-  let d = delayI (deepErrorX "Initial values of expFloat undefined") en clk
-  in d . conditionFloatF $ exp <$> x
+  delayI und en clk . conditionFloatF $ exp <$> x
+ where
+  und = withFrozenCallStack $ deepErrorX "Initial values of expFloat undefined"
 {-# NOINLINE expFloat# #-}
 {-# ANN expFloat#
       (InlinePrimitive [VHDL] $ vhdlUnaryPrim

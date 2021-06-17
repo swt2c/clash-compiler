@@ -211,77 +211,88 @@ addFloatShortPLTB =
                   ])
 {-# ANN addFloatShortPLTB (TestBench 'addFloatShortPL) #-}
 
--- subFloatBasic
---   :: Clock XilinxSystem
---   -> DSignal XilinxSystem 0 Float
---   -> DSignal XilinxSystem 0 Float
---   -> DSignal XilinxSystem SubFloatDefDelay Float
--- subFloatBasic clk x y
---   = withClock clk $ withEnable enableGen $ subFloat' x y
--- {-# NOINLINE subFloatBasic #-}
--- {-# ANN subFloatBasic (binTopAnn "subFloatBasic") #-}
---
--- subFloatBasicTB :: Signal XilinxSystem Bool
--- subFloatBasicTB =
---   basicBinaryTB subFloatBasic
---     $(listToVecTH [ (1, 6, -5) :: (Float, Float, Float)
---                   , (2, 5, -3)
---                   , (3, 4, -1)
---                   ])
--- {-# ANN subFloatBasicTB (TestBench 'subFloatBasic) #-}
---
--- mulFloatBasic
---   :: Clock XilinxSystem
---   -> DSignal XilinxSystem 0 Float
---   -> DSignal XilinxSystem 0 Float
---   -> DSignal XilinxSystem MulFloatDefDelay Float
--- mulFloatBasic clk x y
---   = withClock clk $ withEnable enableGen $ mulFloat' x y
--- {-# NOINLINE mulFloatBasic #-}
--- {-# ANN mulFloatBasic (binTopAnn "mulFloatBasic") #-}
---
--- mulFloatBasicTB :: Signal XilinxSystem Bool
--- mulFloatBasicTB =
---   basicBinaryTB mulFloatBasic
---     $(listToVecTH [ (1, 4, 4) :: (Float, Float, Float)
---                   , (2, 5, 10)
---                   , (3, 6, 18)
---                   ])
--- {-# ANN mulFloatBasicTB (TestBench 'mulFloatBasic) #-}
---
--- divFloatBasic
---   :: Clock XilinxSystem
---   -> DSignal XilinxSystem 0 Float
---   -> DSignal XilinxSystem 0 Float
---   -> DSignal XilinxSystem DivFloatDefDelay Float
--- divFloatBasic clk x y
---   = withClock clk $ withEnable enableGen $ divFloat' x y
--- {-# NOINLINE divFloatBasic #-}
--- {-# ANN divFloatBasic (binTopAnn "divFloatBasic") #-}
---
--- divFloatBasicTB :: Signal XilinxSystem Bool
--- divFloatBasicTB =
---   basicBinaryTB divFloatBasic
---     $(listToVecTH [ (1, 4, 0.25) :: (Float, Float, Float)
---                   , (2, 5, 0.4)
---                   , (3, 6, 0.5)
---                   ])
--- {-# ANN divFloatBasicTB (TestBench 'divFloatBasic) #-}
---
--- expFloatBasic
---   :: Clock XilinxSystem
---   -> DSignal XilinxSystem 0 Float
---   -> DSignal XilinxSystem ExpFloatDefDelay Float
--- expFloatBasic clk x
---   = withClock clk $ withEnable enableGen $ expFloat' x
--- {-# NOINLINE expFloatBasic #-}
--- {-# ANN expFloatBasic (unTopAnn "expFloatBasic") #-}
---
--- expFloatBasicTB :: Signal XilinxSystem Bool
--- expFloatBasicTB =
---   basicUnaryTB expFloatBasic
---     $(listToVecTH [ (1, exp 1) :: (Float, Float)
---                   , (2, exp 2)
---                   , (3, exp 3)
---                   ])
--- {-# ANN expFloatBasicTB (TestBench 'expFloatBasic) #-}
+subFloatBasic
+  :: Clock XilinxSystem
+  -> DSignal XilinxSystem 0 Float
+  -> DSignal XilinxSystem 0 Float
+  -> DSignal XilinxSystem SubFloatDefDelay Float
+subFloatBasic clk x y
+  = withClock clk $ withEnable enableGen $ subFloat' x y
+{-# NOINLINE subFloatBasic #-}
+{-# ANN subFloatBasic (binTopAnn "subFloatBasic") #-}
+
+subFloatBasicTB :: Signal XilinxSystem Bool
+subFloatBasicTB =
+  basicBinaryTB subFloatBasic
+    $(listToVecTH [ (1, 6, -5) :: (Float, Float, Float)
+                  , (2, 5, -3)
+                  , (3, 4, -1)
+                  ])
+{-# ANN subFloatBasicTB (TestBench 'subFloatBasic) #-}
+
+mulFloatBasic
+  :: Clock XilinxSystem
+  -> DSignal XilinxSystem 0 Float
+  -> DSignal XilinxSystem 0 Float
+  -> DSignal XilinxSystem MulFloatDefDelay Float
+mulFloatBasic clk x y
+  = withClock clk $ withEnable enableGen $ mulFloat' x y
+{-# NOINLINE mulFloatBasic #-}
+{-# ANN mulFloatBasic (binTopAnn "mulFloatBasic") #-}
+
+mulFloatBasicTB :: Signal XilinxSystem Bool
+mulFloatBasicTB =
+  basicBinaryTB mulFloatBasic
+    $(listToVecTH [ (1, 4, 4) :: (Float, Float, Float)
+                  , (2, 5, 10)
+                  , (3, 6, 18)
+                  ])
+{-# ANN mulFloatBasicTB (TestBench 'mulFloatBasic) #-}
+
+divFloatBasic
+  :: Clock XilinxSystem
+  -> DSignal XilinxSystem 0 Float
+  -> DSignal XilinxSystem 0 Float
+  -> DSignal XilinxSystem DivFloatDefDelay Float
+divFloatBasic clk x y
+  = withClock clk $ withEnable enableGen $ divFloat' x y
+{-# NOINLINE divFloatBasic #-}
+{-# ANN divFloatBasic (binTopAnn "divFloatBasic") #-}
+
+divFloatBasicTB :: Signal XilinxSystem Bool
+divFloatBasicTB =
+  basicBinaryTB divFloatBasic
+    $(listToVecTH [ (1, 4, 0.25) :: (Float, Float, Float)
+                  , (2, 5, 0.4)
+                  , (3, 6, 0.5)
+                  ])
+{-# ANN divFloatBasicTB (TestBench 'divFloatBasic) #-}
+
+expFloatBasic
+  :: Clock XilinxSystem
+  -> DSignal XilinxSystem 0 Float
+  -> DSignal XilinxSystem ExpFloatDefDelay Float
+expFloatBasic clk x
+  = withClock clk $ withEnable enableGen $ expFloat' x
+{-# NOINLINE expFloatBasic #-}
+{-# ANN expFloatBasic (unTopAnn "expFloatBasic") #-}
+
+expFloatBasicTB :: Signal XilinxSystem Bool
+expFloatBasicTB =
+  basicUnaryTB expFloatBasic
+    $(listToVecTH [ (1, exp 1) :: (Float, Float)
+                  , (2, exp 2)
+                  , (3, exp 3)
+                  ])
+{-# ANN expFloatBasicTB (TestBench 'expFloatBasic) #-}
+
+allTBs :: [Signal XilinxSystem Bool]
+allTBs =
+  [ addFloatBasicTB
+  , addFloatEnableTB
+  , addFloatShortPLTB
+  , subFloatBasicTB
+  , mulFloatBasicTB
+  , divFloatBasicTB
+  , expFloatBasicTB
+  ]
