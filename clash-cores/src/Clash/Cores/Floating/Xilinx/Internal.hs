@@ -3,14 +3,24 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE ViewPatterns #-}
 module Clash.Cores.Floating.Xilinx.Internal
-where
+  ( addFloat#
+  , conditionFloat
+  , conditionFloatF
+  , divFloat#
+  , expFloat#
+  , FloatingArchOpt(..)
+  , FloatingConfig(..)
+  , FloatingDspUsage(..)
+  , mulFloat#
+  , subFloat#
+  , xilinxNaN
+  ) where
 
 import Clash.Explicit.Prelude
 
-import Clash.Annotations.Primitive
 import GHC.Stack (HasCallStack, withFrozenCallStack)
 
-import Clash.Cores.Floating.Xilinx.TH
+import Clash.Cores.Floating.Xilinx.Annotations
 
 -- | Customize Xilinx floating point IP.
 --
@@ -91,7 +101,13 @@ addFloat# !_ clk en (conditionFloatF -> x) (conditionFloatF -> y) =
   und = withFrozenCallStack $ deepErrorX "Initial values of addFloat undefined"
 {-# NOINLINE addFloat# #-}
 {-# ANN addFloat#
-      (InlinePrimitive [VHDL] $ vhdlBinaryPrim
+      (vhdlBinaryPrim
+         "Clash.Cores.Floating.Xilinx.Internal.addFloat#"
+         "addFloat"
+         "Clash.Cores.Floating.Xilinx.BlackBoxes.addFloatTclTF"
+      ) #-}
+{-# ANN addFloat#
+      (veriBinaryPrim
          "Clash.Cores.Floating.Xilinx.Internal.addFloat#"
          "addFloat"
          "Clash.Cores.Floating.Xilinx.BlackBoxes.addFloatTclTF"
@@ -115,7 +131,13 @@ subFloat# !_ clk en (conditionFloatF -> x) (conditionFloatF -> y) =
   und = withFrozenCallStack $ deepErrorX "Initial values of subFloat undefined"
 {-# NOINLINE subFloat# #-}
 {-# ANN subFloat#
-      (InlinePrimitive [VHDL] $ vhdlBinaryPrim
+      (vhdlBinaryPrim
+         "Clash.Cores.Floating.Xilinx.Internal.subFloat#"
+         "subFloat"
+         "Clash.Cores.Floating.Xilinx.BlackBoxes.subFloatTclTF"
+      ) #-}
+{-# ANN subFloat#
+      (veriBinaryPrim
          "Clash.Cores.Floating.Xilinx.Internal.subFloat#"
          "subFloat"
          "Clash.Cores.Floating.Xilinx.BlackBoxes.subFloatTclTF"
@@ -139,7 +161,13 @@ mulFloat# !_ clk en (conditionFloatF -> x) (conditionFloatF -> y) =
   und = withFrozenCallStack $ deepErrorX "Initial values of mulFloat undefined"
 {-# NOINLINE mulFloat# #-}
 {-# ANN mulFloat#
-      (InlinePrimitive [VHDL] $ vhdlBinaryPrim
+      (vhdlBinaryPrim
+         "Clash.Cores.Floating.Xilinx.Internal.mulFloat#"
+         "mulFloat"
+         "Clash.Cores.Floating.Xilinx.BlackBoxes.mulFloatTclTF"
+      ) #-}
+{-# ANN mulFloat#
+      (veriBinaryPrim
          "Clash.Cores.Floating.Xilinx.Internal.mulFloat#"
          "mulFloat"
          "Clash.Cores.Floating.Xilinx.BlackBoxes.mulFloatTclTF"
@@ -163,7 +191,13 @@ divFloat# !_ clk en (conditionFloatF -> x) (conditionFloatF -> y) =
   und = withFrozenCallStack $ deepErrorX "Initial values of divFloat undefined"
 {-# NOINLINE divFloat# #-}
 {-# ANN divFloat#
-      (InlinePrimitive [VHDL] $ vhdlBinaryPrim
+      (vhdlBinaryPrim
+         "Clash.Cores.Floating.Xilinx.Internal.divFloat#"
+         "divFloat"
+         "Clash.Cores.Floating.Xilinx.BlackBoxes.divFloatTclTF"
+      ) #-}
+{-# ANN divFloat#
+      (veriBinaryPrim
          "Clash.Cores.Floating.Xilinx.Internal.divFloat#"
          "divFloat"
          "Clash.Cores.Floating.Xilinx.BlackBoxes.divFloatTclTF"
@@ -186,7 +220,13 @@ expFloat# !_ clk en (conditionFloatF -> x) =
   und = withFrozenCallStack $ deepErrorX "Initial values of expFloat undefined"
 {-# NOINLINE expFloat# #-}
 {-# ANN expFloat#
-      (InlinePrimitive [VHDL] $ vhdlUnaryPrim
+      (vhdlUnaryPrim
+         "Clash.Cores.Floating.Xilinx.Internal.expFloat#"
+         "expFloat"
+         "Clash.Cores.Floating.Xilinx.BlackBoxes.expFloatTclTF"
+      ) #-}
+{-# ANN expFloat#
+      (veriUnaryPrim
          "Clash.Cores.Floating.Xilinx.Internal.expFloat#"
          "expFloat"
          "Clash.Cores.Floating.Xilinx.BlackBoxes.expFloatTclTF"

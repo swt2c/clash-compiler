@@ -6,10 +6,10 @@ Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 Support for the [Xilinx Floating-Point LogiCORE IP v7.1](https://www.xilinx.com/support/documentation/ip_documentation/floating_point/v7_1/pg060-floating-point.pdf).
 
 The functions in this module make it possible to use the Xilinx IP in Clash.
-Simulation produces bit-identical results to synthesis, and compilation will
-instantiate the Xilinx IP. Clash will output a TCL script named
-@floating_point@/.../@.tcl@ which needs to be executed in the Vivado project to
-create the proper entity.
+Compilation will instantiate the Xilinx IP. Clash will output a TCL script
+named @floating_point@/.../@.tcl@ which needs to be executed in the Vivado
+project to create the proper entity. Simulation in Clash produces bit-identical
+results to synthesis.
 
 Most functions allow customization of the Xilinx IP. Valid combinations will
 need to be gleaned from, e.g., the Vivado wizard (IP Catalog -> Floating-point).
@@ -20,7 +20,8 @@ All IP instantiated by this module always has the following properties:
 * No reset input
 * No optional output fields, no @TLAST@, no @TUSER@.
 * @TVALID@ on the inputs is always asserted, @TVALID@ on the output is ignored.
-Note that it would appear the Xilinx IP does not use these signals in non-blocking mode anyway.
+Note that it would appear the Xilinx IP does not use these signals in
+non-blocking mode anyway.
 * 1 cycle per operation (meaning there need not be any dummy cycles between
 consecutive inputs)
 
@@ -67,8 +68,8 @@ module Clash.Cores.Floating.Xilinx
   , subFloat
   , subFloat'
   , SubFloatDefDelay
-  , xilinxIsNaN
   , xilinxIsInf
+  , xilinxIsNaN
   ) where
 
 import Clash.Prelude

@@ -2,15 +2,15 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE RecordWildCards #-}
 module Clash.Cores.Floating.Xilinx.BlackBoxes
-where
+  ( addFloatTclTF
+  , divFloatTclTF
+  , expFloatTclTF
+  , mulFloatTclTF
+  , subFloatTclTF
+  ) where
 
 import Prelude
 
-import Clash.Backend
--- import Clash.Netlist.BlackBox.Util
--- import qualified Clash.Netlist.Id as Id
-import Clash.Netlist.Types
--- import Clash.Netlist.Util
 import Control.Monad.State (State())
 import Data.Maybe (isJust, fromJust)
 -- import Data.Semigroup.Monad (getMon)
@@ -19,6 +19,12 @@ import Data.String.Interpolate (i)
 -- import Data.String.Interpolate.Util (unindent)
 -- import Data.Text as TextS
 import Data.Text.Prettyprint.Doc.Extra
+
+import Clash.Backend
+-- import Clash.Netlist.BlackBox.Util
+-- import qualified Clash.Netlist.Id as Id
+import Clash.Netlist.Types
+-- import Clash.Netlist.Util
 
 data HasCustom = HasCustom
   { addSubVal ::  !(Maybe String)
@@ -42,7 +48,6 @@ hasNoCustom = HasCustom
   , hasDspUsage = False
   , hasBMemUsage = False
   }
-
 
 addFloatTclTF :: TemplateFunction
 addFloatTclTF =
@@ -157,7 +162,6 @@ floatTclTemplate (HasCustom {..}) operType bbCtx = pure bbText
   prop (True, pName, pValue) s =
     replicate 25 ' ' ++ pName ++ ' ': pValue ++ " \\\n" ++ s
 
---   bbText = fromString props
   bbText =
     fromString [i|create_ip -name floating_point -vendor xilinx.com -library ip \\
           -version 7.1 -module_name {#{compName}}
@@ -165,6 +169,8 @@ set_property -dict [list \\
 #{props}                   ] \\
                    [get_ips {#{compName}}]
 generate_target {synthesis simulation} [get_ips {#{compName}}]
+# set_property GENERATE_SYNTH_CHECKPOINT FALSE \\
+#     [get_files [get_property IP_FILE [get_ips {#{compName}}]]]
 |]
 {-
     Hello world!

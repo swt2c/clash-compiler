@@ -1,8 +1,9 @@
 module Xilinx.TH where
 
-import Clash.Prelude (BitPack, natToNum, pack, SNat(..), unpack)
-import Prelude
+import Clash.Prelude (BitPack, natToNum, SNat(..), unpack)
+import Clash.Prelude.ROM.File (memFile)
 
+import Prelude
 import Language.Haskell.TH
   (appTypeE, conE, ExpQ, litE, litT, numTyLit, stringL, tupE)
 import Language.Haskell.TH.Syntax (qRunIO)
@@ -10,28 +11,13 @@ import Language.Haskell.TH.Syntax (qRunIO)
 import Clash.Cores.Floating.Xilinx
 import Clash.Cores.Floating.Xilinx.Internal
 
-showsBitPackFile
-  :: BitPack a
-  => a
-  -> ShowS
-showsBitPackFile
-  x = (((drop 2 . filter (/= '_') . show $ pack x) ++ "\n") ++)
-
-createRomFile
-  :: BitPack a
-  => FilePath
-  -> [a]
-  -> IO ()
-createRomFile file es =
-  writeFile file (foldr showsBitPackFile "" es)
-
 romDataFromFile
   :: BitPack a
   => FilePath
   -> [a]
   -> ExpQ
 romDataFromFile file es =
-  qRunIO (createRomFile file es)
+  qRunIO (writeFile file $ memFile (Just 0) es)
   >> tupE [ appTypeE (conE 'SNat) (litT . numTyLit . toInteger $ length es)
           , litE $ stringL file
           ]

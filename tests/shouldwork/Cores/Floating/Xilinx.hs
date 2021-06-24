@@ -1,13 +1,11 @@
-{-# LANGUAGE PartialTypeSignatures #-}
 module Xilinx where
 
 import Clash.Prelude
-import qualified Prelude as P
 import qualified Clash.Explicit.Prelude as CEP
-
-import Numeric (showHex)
-
 import Clash.Explicit.Testbench
+
+import qualified Prelude as P
+import Numeric (showHex)
 
 import Clash.Cores.Floating.Xilinx
 -- import Clash.Cores.Floating.Xilinx.Internal (xilinxNaN)
@@ -78,10 +76,11 @@ basicBinaryTB comp samples = done
     testInputX = fromSignal $ stimuliGenerator clk rst inputX
     testInputY = fromSignal $ stimuliGenerator clk rst inputY
     expectOutput = outputVerifier' clk rst (repeat @d 0 ++ expectedOutput)
-    done = expectOutput $ ignoreFor clk rst en (SNat @d) 0
-      $ toSignal $ comp clk testInputX testInputY
-    clk = tbClockGen @XilinxSystem (not <$> done)
-    rst = resetGen @XilinxSystem
+    done =
+        expectOutput . ignoreFor clk rst en (SNat @d) 0
+      . toSignal $ comp clk testInputX testInputY
+    clk = tbClockGen (not <$> done)
+    rst = resetGen
     en = enableGen
 {-# INLINE basicBinaryTB #-}
 
@@ -105,11 +104,13 @@ basicRomTB comp n sampleFile = done
     (inputX, inputY, expectedOutput) = unbundle samples
     -- Only assert while not finished
     done = mux done0 done0
-      $ assert clk rst "basicRomTB" out (fmap FloatVerifier expectedOutput) done0
-    out = fmap FloatVerifier $ ignoreFor clk rst en (SNat @d) 0
-      $ toSignal $ comp clk (fromSignal inputX) (fromSignal inputY)
-    clk = tbClockGen @XilinxSystem (not <$> done)
-    rst = resetGen @XilinxSystem
+      $ assert clk rst "basicRomTB" out (fmap FloatVerifier expectedOutput)
+               done0
+    out =
+        fmap FloatVerifier . ignoreFor clk rst en (SNat @d) 0
+      . toSignal $ comp clk (fromSignal inputX) (fromSignal inputY)
+    clk = tbClockGen (not <$> done)
+    rst = resetGen
     en = enableGen
 {-# INLINE basicRomTB #-}
 
@@ -129,10 +130,11 @@ basicUnaryTB comp samples = done
     (input, expectedOutput) = unzip samples
     testInput = fromSignal $ stimuliGenerator clk rst input
     expectOutput = outputVerifier' clk rst (repeat @d 0 ++ expectedOutput)
-    done = expectOutput $ ignoreFor clk rst en (SNat @d) 0
-      $ toSignal $ comp clk testInput
-    clk = tbClockGen @XilinxSystem (not <$> done)
-    rst = resetGen @XilinxSystem
+    done =
+        expectOutput . ignoreFor clk rst en (SNat @d) 0
+      . toSignal $ comp clk testInput
+    clk = tbClockGen (not <$> done)
+    rst = resetGen
     en = enableGen
 {-# INLINE basicUnaryTB #-}
 
@@ -167,7 +169,7 @@ addFloatEnableTB :: Signal XilinxSystem Bool
 addFloatEnableTB = done
  where
   testInput =
-    fromSignal $ stimuliGenerator clk rst $ $(listToVecTH [1 :: Float .. 25])
+    fromSignal $ stimuliGenerator clk rst $(listToVecTH [1 :: Float .. 25])
   en =
     toEnable $ stimuliGenerator clk rst
         (   (replicate d11 True ++ replicate d4 True ++ replicate d4 False)
@@ -179,17 +181,18 @@ addFloatEnableTB = done
            -- Stall for four cycles
            P.++ P.replicate 4 5
            -- Still in the pipeline (11 deep) from before the stall.
-           P.++ P.take 11 [5 .. 30]
+           P.++ P.take 11 [5 .. 25]
            -- We "lose" four samples of what remains due to not being enabled
            -- for those inputs.
            P.++ P.drop 4 (P.drop 11 [5 .. 25])
         )
   expectOutput =
     outputVerifier' clk rst expectedOutput
-  done = expectOutput $ ignoreFor clk rst enableGen d11 0
-    $ toSignal $ addFloatEnable clk en testInput testInput
-  clk = tbClockGen @XilinxSystem (not <$> done)
-  rst = resetGen @XilinxSystem
+  done =
+      expectOutput . ignoreFor clk rst enableGen d11 0
+    . toSignal $ addFloatEnable clk en testInput testInput
+  clk = tbClockGen (not <$> done)
+  rst = resetGen
 {-# ANN addFloatEnableTB (TestBench 'addFloatEnable) #-}
 
 addFloatShortPL
@@ -286,6 +289,45 @@ expFloatBasicTB =
                   ])
 {-# ANN expFloatBasicTB (TestBench 'expFloatBasic) #-}
 
+expFloatEnable
+  :: Clock XilinxSystem
+  -> Enable XilinxSystem
+  -> DSignal XilinxSystem 0 Float
+  -> DSignal XilinxSystem 20 Float
+expFloatEnable clk en x
+  = withClock clk $ withEnable en $ expFloat' x
+{-# NOINLINE expFloatEnable #-}
+{-# ANN expFloatEnable (unEnTopAnn "expFloatEnable") #-}
+
+expFloatEnableTB :: Signal XilinxSystem Bool
+expFloatEnableTB = done
+ where
+  testInput =
+    fromSignal $ stimuliGenerator clk rst $ $(listToVecTH [1 :: Float .. 35])
+  en =
+    toEnable $ stimuliGenerator clk rst
+        (   (replicate d20 True ++ replicate d4 True ++ replicate d4 False)
+         :< True)
+  expectedOutput =
+       replicate d20 0
+    ++ $(listToVecTH . P.map (\i -> exp i) $
+                [1 :: Float .. 4]
+           -- Stall for four cycles
+           P.++ P.replicate 4 5
+           -- Still in the pipeline (20 deep) from before the stall.
+           P.++ P.take 20 [5 .. 35]
+           -- We "lose" four samples of what remains due to not being enabled
+           -- for those inputs.
+           P.++ P.drop 4 (P.drop 20 [5 .. 35])
+        )
+  expectOutput =
+    outputVerifier' clk rst expectedOutput
+  done = expectOutput $ ignoreFor clk rst enableGen d20 0
+    $ toSignal $ expFloatEnable clk en testInput
+  clk = tbClockGen @XilinxSystem (not <$> done)
+  rst = resetGen @XilinxSystem
+{-# ANN expFloatEnableTB (TestBench 'expFloatEnable) #-}
+
 allTBs :: [Signal XilinxSystem Bool]
 allTBs =
   [ addFloatBasicTB
@@ -295,4 +337,5 @@ allTBs =
   , mulFloatBasicTB
   , divFloatBasicTB
   , expFloatBasicTB
+  , expFloatEnableTB
   ]

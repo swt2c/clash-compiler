@@ -37,3 +37,15 @@ unTopAnn name =
           ]
     , t_output = PortName "result"
     }
+
+unEnTopAnn :: String -> TopEntity
+unEnTopAnn name =
+  Synthesize
+    { t_name   = name
+    , t_inputs =
+          [ PortName "clk"
+          , PortName "en"
+          , PortName "x"
+          ]
+    , t_output = PortName "result"
+    }
