@@ -18,13 +18,16 @@ import Data.String (fromString)
 import Data.String.Interpolate (i)
 -- import Data.String.Interpolate.Util (unindent)
 -- import Data.Text as TextS
-import Data.Text.Prettyprint.Doc.Extra
 
-import Clash.Backend
+import Clash.Backend (Backend())
 -- import Clash.Netlist.BlackBox.Util
 -- import qualified Clash.Netlist.Id as Id
-import Clash.Netlist.Types
+import Clash.Netlist.Types (
+  BlackBoxContext(..), Expr(..), HWType(..), Literal(..), Modifier(..),
+  TemplateFunction(..))
+
 -- import Clash.Netlist.Util
+import Data.Text.Prettyprint.Doc.Extra (Doc)
 
 data HasCustom = HasCustom
   { addSubVal ::  !(Maybe String)
