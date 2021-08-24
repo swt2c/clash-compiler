@@ -2,9 +2,10 @@
 Copyright  :  (C) 2013-2016, University of Twente,
                   2016-2019, Myrtle Software,
                   2017     , Google Inc.
-                  2020     , Ben Gamari
+                  2020     , Ben Gamari,
+                  2021     , QBayLogic B.V.
 License    :  BSD2 (see the file LICENSE)
-Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
+Maintainer :  QBayLogic B.V. <devops@qbaylogic.com>
 
 Clash has synchronous 'Signal's in the form of:
 
