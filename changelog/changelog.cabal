@@ -1,0 +1,50 @@
+Cabal-version:        2.2
+Name:                 changelog
+Version:              0.0.0
+Synopsis:             Changelog generator
+License:              BSD-2-Clause
+Author:               The Clash Authors
+Maintainer:           QBayLogic B.V. <devops@qbaylogic.com>
+Copyright:            Copyright © 2021 QBayLogic B.V.
+Category:             Hardware
+
+common common-options
+  default-language:   Haskell2010
+  default-extensions:
+    BangPatterns
+    BinaryLiterals
+    DataKinds
+    DefaultSignatures
+    DeriveDataTypeable
+    DeriveFoldable
+    DeriveFunctor
+    DeriveGeneric
+    DeriveLift
+    DeriveTraversable
+    DerivingStrategies
+    InstanceSigs
+    KindSignatures
+    MagicHash
+    NoStarIsType
+    ScopedTypeVariables
+    StandaloneDeriving
+    TupleSections
+    TypeApplications
+    TypeOperators
+    ViewPatterns
+
+executable changelog
+  import:             common-options
+  ghc-options:        -Wall -Wcompat
+  Build-depends:
+      aeson >= 2.0
+    , aeson-pretty
+    , base
+    , clash-prelude
+    , deepseq
+    , directory
+    , docopt >= 0.7.0.7
+    , filepath
+    , Glob
+    , regex-compat
+  Main-is:            Changelog.hs

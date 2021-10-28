@@ -31,6 +31,8 @@ cradle:
       config: { cradle: {none: }}
     - path: "./clash-term"
       config: { cradle: {cabal: {component: "exe:clash-term"}}}
+    - path: "./changelog"
+      config: { cradle: {cabal: {component: "exe:changelog"}}}
     # Skip examples for now
     - path: "./examples"
       config: { cradle: {none: }}

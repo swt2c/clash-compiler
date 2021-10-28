@@ -5,6 +5,7 @@ Maintainer :  Christiaan Baaij <christiaan.baaij@gmail.com>
 -}
 
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE PackageImports #-}
 
 {-# OPTIONS_HADDOCK hide #-}
 
@@ -20,9 +21,9 @@ module Clash.CPP
 #ifdef LARGE_TUPLES
 
 #if MIN_VERSION_ghc(9,0,0)
-import GHC.Settings.Constants (mAX_TUPLE_SIZE)
+import "ghc" GHC.Settings.Constants (mAX_TUPLE_SIZE)
 #else
-import Constants (mAX_TUPLE_SIZE)
+import "ghc" Constants (mAX_TUPLE_SIZE)
 #endif
 #define MAX_TUPLE_SIZE (fromIntegral mAX_TUPLE_SIZE)
 
