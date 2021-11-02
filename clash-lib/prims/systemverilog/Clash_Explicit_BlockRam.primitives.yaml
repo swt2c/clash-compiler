@@ -188,3 +188,6 @@
 
       assign ~RESULT = {~SYM[1], ~SYM[2]};
       // end trueDualPortBlockRam
+- BlackBoxHaskell:
+    name: Clash.Explicit.BlockRam.trueDualPortBlockRam#
+    templateFunction: "Clash.Primitives.TrueDualPortBlockRam.trueDualPortBlockRamSystemVerilog"

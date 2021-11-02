@@ -232,3 +232,6 @@
         ~RESULT <= (~SYM[2], ~SYM[3]);
       end block;
       -- end trueDualPortBlockRam
+- BlackBoxHaskell:
+    name: Clash.Explicit.BlockRam.trueDualPortBlockRam#
+    templateFunction: "Clash.Primitives.TrueDualPortBlockRam.trueDualPortBlockRamVHDL"
