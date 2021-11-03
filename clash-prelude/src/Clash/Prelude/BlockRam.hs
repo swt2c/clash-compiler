@@ -896,7 +896,7 @@ trueDualPortBlockRam config inA inB =
   forall nAddrs dom a .
   ( HasCallStack
   , KnownNat nAddrs
-  , HiddenClock dom
+  , HiddenClockResetEnable dom
   , NFDataX a
   , BitPack a
   )

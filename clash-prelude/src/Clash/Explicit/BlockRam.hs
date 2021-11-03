@@ -1143,11 +1143,13 @@ data TDPConfig = TDPConfig {
   outputRegA :: Bool,
   outputRegB :: Bool}
 
+
+tdpDefault :: TDPConfig
 tdpDefault = TDPConfig {
   writeModeA = NoChange,
   writeModeB = NoChange,
   outputRegA = True,
-  outputRegB = False}
+  outputRegB = True}
 
 -- | Port operation
 data RamOp n a
