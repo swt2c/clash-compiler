@@ -34,14 +34,15 @@ import Data.Constraint.Nat         (leTrans)
 import Data.Maybe                  (isJust)
 import GHC.TypeLits                (type (+), type (-), type (<=), type (^), KnownNat)
 
-import Clash.Class.BitPack         (boolToBV, unpack)
+import Clash.Class.BitPack         (BitPack, boolToBV, unpack)
 import Clash.Class.Resize          (truncateB)
 import Clash.Class.BitPack.BitIndex (slice)
 import Clash.Explicit.Mealy        (mealyB)
 import Clash.Explicit.BlockRam
   (RamOp (..), trueDualPortBlockRam, tdpDefault)
 import Clash.Explicit.Signal
-  (Clock, Reset, Signal, Enable, register, unsafeSynchronizer, fromEnable, (.&&.))
+  (Clock, Reset, Signal, Enable, register, unsafeSynchronizer, fromEnable, (.&&.),
+   enableGen, unsafeFromHighPolarity)
 import Clash.Promoted.Nat          (SNat (..))
 import Clash.Promoted.Nat.Literals (d0)
 import Clash.Signal                (mux, KnownDomain)
@@ -103,7 +104,8 @@ fifoMem
      , KnownDomain rdom
      , NFDataX a
      , KnownNat addrSize
-     , 1 <= addrSize )
+     , 1 <= addrSize
+     , BitPack a)
   => Clock wdom
   -> Clock rdom
   -> Enable wdom
@@ -115,7 +117,11 @@ fifoMem
   -> Signal rdom a
 fifoMem wclk rclk wen ren full raddr waddr wdataM =
   fst $ trueDualPortBlockRam tdpDefault
-    rclk wclk portA portB
+    rclk wclk
+    enableGen enableGen
+    (unsafeFromHighPolarity (pure False))
+    (unsafeFromHighPolarity (pure False))
+    portA portB
  where
 
    portA :: Signal rdom (RamOp (2 ^ addrSize) a)
@@ -208,7 +214,8 @@ asyncFIFOSynchronizer
   :: ( KnownDomain wdom
      , KnownDomain rdom
      , 2 <= addrSize
-     , NFDataX a )
+     , NFDataX a
+     , BitPack a)
   => SNat addrSize
   -- ^ Size of the internally used addresses, the  FIFO contains @2^addrSize@
   -- elements.

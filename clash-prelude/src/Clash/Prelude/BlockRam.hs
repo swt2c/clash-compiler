@@ -399,6 +399,8 @@ module Clash.Prelude.BlockRam
     -- $tdpbram
   , trueDualPortBlockRam
   , E.RamOp(..)
+  , E.TDPConfig
+  , E.WriteMode
   )
 where
 
@@ -407,6 +409,7 @@ import           Prelude                 (Enum, Maybe, Eq)
 import           GHC.TypeLits            (KnownNat, type (^), type (<=))
 import           GHC.Stack               (HasCallStack, withFrozenCallStack)
 
+import           Clash.Class.BitPack.Internal (BitPack)
 import qualified Clash.Explicit.BlockRam as E
 import           Clash.Promoted.Nat      (SNat)
 import           Clash.Signal
@@ -871,33 +874,44 @@ trueDualPortBlockRam ::
   forall nAddrs dom1 dom2 a .
   ( HasCallStack
   , KnownNat nAddrs
-  , HiddenClock dom1
-  , HiddenClock dom2
+  , HiddenClockResetEnable dom1
+  , HiddenClockResetEnable dom2
   , NFDataX a
+  , BitPack a
   )
-  => Signal dom1 (E.RamOp nAddrs a)
+  => E.TDPConfig
+  -> Signal dom1 (E.RamOp nAddrs a)
   -- ^ RAM operation for port A
   -> Signal dom2 (E.RamOp nAddrs a)
   -- ^ RAM operation for port B
   -> (Signal dom1 a, Signal dom2 a)
   -- ^ Outputs data on /next/ cycle. When writing, the data written
   -- will be echoed. When reading, the read data is returned.
-trueDualPortBlockRam inA inB =
-  E.trueDualPortBlockRam E.tdpDefault (hasClock @dom1) (hasClock @dom2) inA inB
+trueDualPortBlockRam config inA inB =
+  E.trueDualPortBlockRam config
+    (hasClock @dom1) (hasClock @dom2)
+    (hasEnable @dom1) (hasEnable @dom2) (hasReset @dom1) (hasReset @dom2)
+    inA inB
 #else
   forall nAddrs dom a .
   ( HasCallStack
   , KnownNat nAddrs
   , HiddenClock dom
   , NFDataX a
+  , BitPack a
   )
-  => Signal dom (E.RamOp nAddrs a)
+  => E.TDPConfig
+  -> Signal dom (E.RamOp nAddrs a)
   -- ^ RAM operation for port A
   -> Signal dom (E.RamOp nAddrs a)
   -- ^ RAM operation for port B
   -> (Signal dom a, Signal dom a)
   -- ^ Outputs data on /next/ cycle. When writing, the data written
   -- will be echoed. When reading, the read data is returned.
-trueDualPortBlockRam wmA wmB inA inB =
-  E.trueDualPortBlockRam E.tdpDefault hasClock hasClock inA inB
+trueDualPortBlockRam config inA inB =
+  E.trueDualPortBlockRam config
+    hasClock hasClock
+    hasEnable hasEnable
+    hasReset hasReset
+    inA inB
 #endif
