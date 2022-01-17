@@ -77,11 +77,7 @@ data RewriteStep
 -- | State of a rewriting session
 data RewriteState extra
   = RewriteState
-    -- TODO Given we now keep transformCounters, this should just be 'fold'
-    -- over that map, otherwise the two counts could fall out of sync.
-  { _transformCounter :: {-# UNPACK #-} !Word
-  -- ^ Total number of applied transformations
-  , _transformCounters :: HashMap Text Word
+  { _transformCounters :: HashMap Text Word
   -- ^ Map that tracks how many times each transformation is applied
   , _bindings         :: !BindingMap
   -- ^ Global binders

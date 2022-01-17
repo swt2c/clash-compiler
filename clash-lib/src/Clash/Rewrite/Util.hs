@@ -27,7 +27,7 @@ module Clash.Rewrite.Util
 import           Control.Concurrent.Supply   (splitSupply)
 import           Control.DeepSeq
 import           Control.Exception           (throw)
-import           Control.Lens ((%=), (+=), (^.))
+import           Control.Lens ((%=), (^.))
 import qualified Control.Lens                as Lens
 import qualified Control.Monad               as Monad
 import qualified Control.Monad.State.Strict  as State
@@ -151,7 +151,9 @@ apply = \s rewrite ctx expr0 -> do
 
   (!expr1,anyChanged) <- Writer.listen (rewrite ctx expr0)
   let hasChanged = Monoid.getAny anyChanged
-  Monad.when hasChanged (transformCounter += 1)
+
+  Monad.when hasChanged $
+    transformCounters %= HashMap.insertWith (const succ) (Text.pack s) 1
 
   -- NB: When -fclash-debug-history is on, emit binary data holding the recorded rewrite steps
   let rewriteHistFile = dbg_historyFile opts
@@ -185,7 +187,7 @@ applyDebug
   -- ^ New expression
   -> RewriteMonad extra Term
 applyDebug name exprOld hasChanged exprNew = do
-  nTrans <- Lens.use transformCounter
+  nTrans <- sum <$> Lens.use transformCounters
   opts <- Lens.view debugOpts
 
   let from = fromMaybe 0 (dbg_transformationsFrom opts)
@@ -196,11 +198,9 @@ applyDebug name exprOld hasChanged exprNew = do
      | nTrans <= from ->
          pure exprNew
      | otherwise ->
-         go opts
+         go (pred nTrans) opts
  where
-  go opts = traceIf (hasDebugInfo TryTerm name opts) ("Tried: " ++ name ++ " on:\n" ++ before) $ do
-    nTrans <- pred <$> Lens.use transformCounter
-
+  go nTrans opts = traceIf (hasDebugInfo TryTerm name opts) ("Tried: " ++ name ++ " on:\n" ++ before) $ do
     Monad.when (dbg_countTransformations opts && hasChanged) $ do
       transformCounters %= HashMap.insertWith (const succ) (Text.pack name) 1
 
@@ -285,7 +285,7 @@ runRewriteSession r s m = do
   traceIf (dbg_countTransformations (opt_debug (envOpts (_clashEnv r))))
     ("Clash: Transformations:\n" ++ Text.unpack (showCounters (s' ^. transformCounters))) $
     traceIf (None < dbg_transformationInfo (opt_debug (envOpts (_clashEnv r))))
-      ("Clash: Applied " ++ show (s' ^. transformCounter) ++ " transformations")
+      ("Clash: Applied " ++ show (s' ^. transformCounters . Lens.to sum) ++ " transformations")
       pure a
   where
     showCounters =

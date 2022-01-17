@@ -125,7 +125,6 @@ runNormalization env supply globals typeTrans peEval eval rcsMap topEnts =
                   (mkVarSet topEnts)
 
     rwState   = RewriteState
-                  0
                   mempty       -- transformCounters Map
                   globals
                   supply
