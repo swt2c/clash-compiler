@@ -155,6 +155,9 @@ Library
                       hint                    >= 0.7      && < 0.10,
                       interpolate             >= 0.2.0    && < 1.0,
                       lens                    >= 4.10     && < 5.1.0,
+                      -- TODO bounds
+                      lifted-base,
+                      monad-control,
                       mtl                     >= 2.1.2    && < 2.3,
                       ordered-containers      >= 0.2      && < 0.3,
                       prettyprinter           >= 1.2.0.1  && < 1.8,
@@ -166,6 +169,7 @@ Library
                       text                    >= 1.2.2    && < 2.1,
                       time                    >= 1.4.0.1  && < 1.14,
                       transformers            >= 0.5.2.0  && < 0.7,
+                      transformers-base,
                       trifecta                >= 1.7.1.1  && < 2.2,
                       vector                  >= 0.11     && < 1.0,
                       vector-binary-instances >= 0.2.3.5  && < 0.3,

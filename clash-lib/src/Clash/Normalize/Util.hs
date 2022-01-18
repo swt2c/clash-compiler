@@ -33,7 +33,8 @@ module Clash.Normalize.Util
  )
  where
 
-import           Control.Lens            ((&),(+~),(%=),(.=))
+import qualified Control.Concurrent.MVar.Lifted as MVar
+import           Control.Lens            ((&),(+~),(.=))
 import qualified Control.Lens            as Lens
 import           Data.Bifunctor          (bimap)
 import           Data.Either             (lefts,rights)
@@ -87,7 +88,7 @@ import           Clash.Rewrite.Types
 import           Clash.Rewrite.Util
   (runRewrite, mkTmBinderFor, mkDerivedName)
 import           Clash.Unique
-import           Clash.Util              (SrcSpan, makeCachedU)
+import           Clash.Util              (SrcSpan)
 
 -- | Determine if argument should reduce to a constant given a primitive and
 -- an argument number. Caches results.
@@ -102,23 +103,26 @@ isConstantArg
   -- blackbox.
 isConstantArg "Clash.Explicit.SimIO.mealyIO" i = pure (i == 2 || i == 3)
 isConstantArg nm i = do
-  argMap <- Lens.use (extra.primitiveArgs)
-  case Map.lookup nm argMap of
-    Nothing -> do
-      -- Constant args not yet calculated, or primitive does not exist
-      prims <- Lens.view primitives
-      case extractPrim =<< HashMapS.lookup nm prims of
-        Nothing ->
-          -- Primitive does not exist:
-          pure False
-        Just p -> do
-          -- Calculate constant arguments:
-          let m = constantArgs nm p
-          (extra.primitiveArgs) Lens.%= Map.insert nm m
-          pure (i `elem` m)
-    Just m ->
-      -- Cached version found
-      pure (i `elem` m)
+  argMapV <- Lens.use (extra.primitiveArgs)
+
+  MVar.modifyMVar argMapV $ \argMap ->
+    case Map.lookup nm argMap of
+      Nothing -> do
+        prims <- Lens.view primitives
+        -- Constant args not yet calculated, or primitive does not exist
+        case extractPrim =<< HashMapS.lookup nm prims of
+          Nothing ->
+            -- Primitive does not exist:
+            pure (argMap, False)
+
+          Just p ->
+            -- Calculate constant arguments:
+            let m = constantArgs nm p
+             in pure (Map.insert nm m argMap, i `elem` m)
+
+      Just m ->
+        -- Cached version found
+        pure (argMap, i `elem` m)
 
 -- | Given a list of transformation contexts, determine if any of the contexts
 -- indicates that the current arg is to be reduced to a constant / literal.
@@ -139,10 +143,12 @@ alreadyInlined
   -- ^ Function in which we want to perform the inlining
   -> NormalizeMonad (Maybe Int)
 alreadyInlined f cf = do
-  inlinedHM <- Lens.use inlineHistory
-  case lookupVarEnv cf inlinedHM of
-    Nothing       -> return Nothing
-    Just inlined' -> return (lookupVarEnv f inlined')
+  inlinedHMV <- Lens.use inlineHistory
+
+  MVar.withMVar inlinedHMV $ \inlinedHM ->
+    case lookupVarEnv cf inlinedHM of
+      Nothing       -> return Nothing
+      Just inlined' -> return (lookupVarEnv f inlined')
 
 -- | Record a new inlining in the `inlineHistory`
 addNewInline
@@ -151,11 +157,11 @@ addNewInline
   -> Id
   -- ^ Function in which we're inlining it
   -> NormalizeMonad ()
-addNewInline f cf =
-  inlineHistory %= extendVarEnvWith
-                     cf
-                     (unitVarEnv f 1)
-                     (\_ hm -> extendVarEnvWith f 1 (+) hm)
+addNewInline f cf = do
+  inlineHistV <- Lens.use inlineHistory
+
+  MVar.modifyMVar_ inlineHistV $
+    pure . extendVarEnvWith cf (unitVarEnv f 1) (\_ hm -> extendVarEnvWith f 1 (+) hm)
 
 -- | Test whether a given term represents a non-recursive global variable
 isNonRecursiveGlobalVar
@@ -172,20 +178,21 @@ isRecursiveBndr
   :: Id
   -> NormalizeSession Bool
 isRecursiveBndr f = do
-  cg <- Lens.use (extra.recursiveComponents)
-  case lookupVarEnv f cg of
-    Just isR -> return isR
-    Nothing -> do
-      fBodyM <- lookupVarEnv f <$> Lens.use bindings
-      case fBodyM of
-        Nothing -> return False
-        Just b -> do
-          -- There are no global mutually-recursive functions, only self-recursive
-          -- ones, so checking whether 'f' is part of the free variables of the
-          -- body of 'f' is sufficient.
-          let isR = f `globalIdOccursIn` bindingTerm b
-          (extra.recursiveComponents) %= extendVarEnv f isR
-          return isR
+  cgV <- Lens.use (extra.recursiveComponents)
+
+  MVar.modifyMVar cgV $ \cg ->
+    case lookupVarEnv f cg of
+      Just isR -> pure (cg, isR)
+      Nothing -> do
+        fBodyM <- lookupVarEnv f <$> Lens.use bindings
+        case fBodyM of
+          Nothing -> pure (cg, False)
+          Just b ->
+            -- There are no global mutually-recursive functions, only self-recursive
+            -- ones, so checking whether 'f' is part of the free variables of the
+            -- body of 'f' is sufficient.
+            let isR = f `globalIdOccursIn` bindingTerm b
+             in pure (extendVarEnv f isR cg, isR)
 
 data ConstantSpecInfo =
   ConstantSpecInfo
@@ -408,22 +415,37 @@ normalizeTopLvlBndr
   -> Id
   -> Binding Term
   -> NormalizeSession (Binding Term)
-normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm _) = makeCachedU nm (extra.normalized) $ do
-  tcm <- Lens.view tcCache
-  let nmS = showPpr (varName nm)
-  -- We deshadow the term because sometimes GHC gives us
-  -- code where a local binder has the same unique as a
-  -- global binder, sometimes causing the inliner to go
-  -- into a loop. Deshadowing freshens all the bindings
-  -- to avoid this.
-  let tm1 = deShadowTerm emptyInScopeSet tm
-      tm2 = if isTop then substWithTyEq tm1 else tm1
-  old <- Lens.use curFun
-  tm3 <- rewriteExpr ("normalization",normalization) (nmS,tm2) (nm',sp)
-  curFun .= old
-  let ty' = inferCoreTypeOf tcm tm3
-  let r' = nm' `globalIdOccursIn` tm3
-  return (Binding nm'{varType = ty'} sp inl pr tm3 r')
+normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm _) = do
+  normalizedV <- Lens.use (extra.normalized)
+
+  mValue <- MVar.withMVar normalizedV (pure . lookupVarEnv nm)
+
+  -- TODO This was a call to makeCachedU, but since there was no variation
+  -- for MVar, I unrolled everything. Maybe there should be MVar versions of
+  -- the makeCachedX functions needed in normalization.
+  case mValue of
+    Just value ->
+      pure value
+
+    Nothing -> do
+      tcm <- Lens.view tcCache
+      let nmS = showPpr (varName nm)
+      -- We deshadow the term because sometimes GHC gives us
+      -- code where a local binder has the same unique as a
+      -- global binder, sometimes causing the inliner to go
+      -- into a loop. Deshadowing freshens all the bindings
+      -- to avoid this.
+      let tm1 = deShadowTerm emptyInScopeSet tm
+          tm2 = if isTop then substWithTyEq tm1 else tm1
+      old <- Lens.use curFun
+      tm3 <- rewriteExpr ("normalization",normalization) (nmS,tm2) (nm',sp)
+      curFun .= old
+      let ty' = inferCoreTypeOf tcm tm3
+      let r' = nm' `globalIdOccursIn` tm3
+      let value = Binding nm'{varType = ty'} sp inl pr tm3 r'
+
+      MVar.modifyMVar normalizedV $ \binders ->
+        pure (extendVarEnv nm value binders, value)
 
 -- | Turn type equality constraints into substitutions and apply them.
 --

@@ -16,6 +16,7 @@
 
 module Clash.Normalize where
 
+import qualified Control.Concurrent.MVar.Lifted as MVar
 import           Control.Concurrent.Supply        (Supply)
 import           Control.Exception                (throw)
 import qualified Control.Lens                     as Lens
@@ -113,34 +114,35 @@ runNormalization
   -> NormalizeSession a
   -- ^ NormalizeSession to run
   -> IO a
-runNormalization env supply globals typeTrans peEval eval rcsMap topEnts =
-  runRewriteSession rwEnv rwState
-  where
-    -- TODO The RewriteEnv should just take ClashOpts.
-    rwEnv     = RewriteEnv
-                  env
-                  typeTrans
-                  peEval
-                  eval
-                  (mkVarSet topEnts)
+runNormalization env supply globals typeTrans peEval eval rcsMap topEntities session = do
+  normState <- NormalizeState
+    <$> MVar.newMVar emptyVarEnv
+    <*> MVar.newMVar Map.empty
+    <*> MVar.newMVar emptyVarEnv
+    <*> MVar.newMVar emptyVarEnv
+    <*> MVar.newMVar Map.empty
+    <*> MVar.newMVar rcsMap
 
-    rwState   = RewriteState
-                  mempty       -- transformCounters Map
-                  globals
-                  supply
-                  (error $ $(curLoc) ++ "Report as bug: no curFun",noSrcSpan)
-                  0
-                  (IntMap.empty, 0)
-                  emptyVarEnv
-                  normState
+  runRewriteSession rwEnv (rwState normState) session
+ where
+  rwEnv = RewriteEnv
+    { _clashEnv = env
+    , _typeTranslator = typeTrans
+    , _peEvaluator = peEval
+    , _evaluator = eval
+    , _topEntities = mkVarSet topEntities
+    }
 
-    normState = NormalizeState
-                  emptyVarEnv
-                  Map.empty
-                  emptyVarEnv
-                  emptyVarEnv
-                  Map.empty
-                  rcsMap
+  rwState s = RewriteState
+    { _transformCounters = mempty
+    , _bindings = globals
+    , _uniqSupply = supply
+    , _curFun = (error $ $(curLoc) ++ "Report as bug: no curFun", noSrcSpan)
+    , _nameCounter = 0
+    , _globalHeap = (IntMap.empty, 0)
+    , _workFreeBinders = emptyVarEnv
+    , _extra = s
+    }
 
 normalize
   :: [Id]
@@ -191,10 +193,14 @@ normalize' nm = do
                             , ") remains recursive after normalization:\n"
                             , showPpr (bindingTerm tmNorm) ])
                     (return ())
-            prevNorm <- mapVarEnv bindingId <$> Lens.use (extra.normalized)
-            let toNormalize = filter (`notElemVarSet` topEnts)
-                            $ filter (`notElemVarEnv` (extendVarEnv nm nm prevNorm)) usedBndrs
-            return (toNormalize,(nm,tmNorm))
+
+            normV <- Lens.use (extra.normalized)
+
+            MVar.withMVar normV $ \norm ->
+              let prevNorm = mapVarEnv bindingId norm
+                  toNormalize = filter (`notElemVarSet` topEnts)
+                              $ filter (`notElemVarEnv` extendVarEnv nm nm prevNorm) usedBndrs
+               in return (toNormalize,(nm,tmNorm))
          else
            do
             -- Throw an error for unrepresentable topEntities and functions

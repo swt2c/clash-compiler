@@ -17,6 +17,13 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeFamilies #-}
+
+#if MIN_VERSION_transformers(0,5,6)
+{-# LANGUAGE UndecidableInstances #-}
+
+{-# OPTIONS_GHC -Wno-orphans #-}
+#endif
 
 module Clash.Rewrite.Types where
 
@@ -24,15 +31,23 @@ import Control.Concurrent.Supply             (Supply, freshId)
 import Control.DeepSeq                       (NFData)
 import Control.Lens                          (Lens', use, (.=))
 import qualified Control.Lens as Lens
+import Control.Monad.Base
+#if !MIN_VERSION_base(4,13,0)
+import Control.Monad.Fail                    (MonadFail)
+#endif
 import Control.Monad.Fix                     (MonadFix)
 import Control.Monad.State.Strict            (State)
 #if MIN_VERSION_transformers(0,5,6)
 import Control.Monad.Reader                  (MonadReader (..))
 import Control.Monad.State                   (MonadState (..))
+import Control.Monad.Trans.Control
+  ( ComposeSt, MonadBaseControl(..), MonadTransControl(..)
+  , defaultLiftBaseWith, defaultRestoreM)
 import Control.Monad.Trans.RWS.CPS           (RWST)
 import qualified Control.Monad.Trans.RWS.CPS as RWS
 import Control.Monad.Writer                  (MonadWriter (..))
 #else
+import Control.Monad.Trans.Control (MonadBaseControl(..))
 import Control.Monad.Trans.RWS.Strict        (RWST)
 import qualified Control.Monad.Trans.RWS.Strict as RWS
 #endif
@@ -168,6 +183,8 @@ newtype RewriteMonad extra a = R
     ( Applicative
     , Functor
     , Monad
+    , MonadBase IO
+    , MonadBaseControl IO
     , MonadFix
     )
 
@@ -208,6 +225,34 @@ instance MonadReader RewriteEnv (RewriteMonad extra) where
    {-# INLINE local #-}
    reader = R . RWS.reader
    {-# INLINE reader #-}
+#endif
+
+#if MIN_VERSION_transformers(0,5,6) && !MIN_VERSION_transformers_base(0,4,6)
+instance (Monoid w, MonadBase b m) => MonadBase b (RWST r w s m) where
+  liftBase = liftBaseDefault
+#endif
+
+#if MIN_VERSION_transformers(0,5,6)
+-- For Control.Monad.Trans.RWS.Strict these are already defined, however
+-- the CPS version of RWS is now included in `monad-control` yet.
+
+instance (Monoid w) => MonadTransControl (RWST r w s) where
+  type StT (RWST r w s) a = (a, s, w)
+
+  liftWith f = RWS.rwsT $ \r s ->
+    fmap (\x -> (x, s, mempty)) (f (\t -> RWS.runRWST t r s))
+  {-# INLINE liftWith #-}
+
+  restoreT m = RWS.rwsT $ \_ _ -> m
+  {-# INLINE restoreT #-}
+
+instance (Monoid w, MonadBaseControl b m) => MonadBaseControl b (RWST r w s m) where
+  type StM (RWST r w s m) a = ComposeSt (RWST r w s) m a
+
+  liftBaseWith = defaultLiftBaseWith
+  {-# INLINE liftBaseWith #-}
+  restoreM = defaultRestoreM
+  {-# INLINE restoreM #-}
 #endif
 
 instance MonadUnique (RewriteMonad extra) where

@@ -94,10 +94,10 @@ import           Clash.Util.Eq               (fastEqBy)
 import qualified Clash.Util.Interpolate as I
 
 -- | Lift an action working in the '_extra' state to the 'RewriteMonad'
-zoomExtra :: State.State extra a -> RewriteMonad extra a
-zoomExtra m = R . RWS.rwsT $ \_ s ->
-  let (a, st') = State.runState m (_extra s)
-   in pure (a, s { _extra = st' }, mempty)
+zoomExtra :: State.StateT extra IO a -> RewriteMonad extra a
+zoomExtra m = R . RWS.rwsT $ \_ s -> do
+  (a, st') <- State.runStateT m (_extra s)
+  pure (a, s { _extra = st' }, mempty)
 
 -- | Some transformations might erroneously introduce shadowing. For example,
 -- a transformation might result in:

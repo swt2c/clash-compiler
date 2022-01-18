@@ -30,6 +30,7 @@ import Clash.Unique (emptyUniqMap)
 import qualified Clash.Util.Interpolate as I
 
 import Control.Applicative ((<|>))
+import Control.Concurrent.MVar (newMVar)
 import Control.Concurrent.Supply (newSupply)
 import Data.Default
 import Language.Haskell.Exts.Syntax
@@ -73,8 +74,17 @@ instance Default RewriteEnv where
     , _topEntities=emptyVarSet
     }
 
-instance Default extra => Default (RewriteState extra) where
-  def = RewriteState
+defRewriteState :: IO (RewriteState NormalizeState)
+defRewriteState = do
+  normState <- NormalizeState
+    <$> newMVar emptyVarEnv
+    <*> newMVar Map.empty
+    <*> newMVar emptyVarEnv
+    <*> newMVar emptyVarEnv
+    <*> newMVar Map.empty
+    <*> newMVar emptyVarEnv
+
+  pure RewriteState
     { _transformCounters=mempty
     , _bindings=emptyVarEnv
     , _uniqSupply=unsafePerformIO newSupply
@@ -82,17 +92,7 @@ instance Default extra => Default (RewriteState extra) where
     , _nameCounter=2
     , _workFreeBinders=emptyVarEnv
     , _globalHeap=error "_globalHeap: NYI"
-    , _extra=def
-    }
-
-instance Default NormalizeState where
-  def = NormalizeState
-    { _normalized=emptyVarEnv
-    , _specialisationCache=Map.empty
-    , _specialisationHistory=emptyVarEnv
-    , _inlineHistory=emptyVarEnv
-    , _primitiveArgs=Map.empty
-    , _recursiveComponents=emptyVarEnv
+    , _extra=normState
     }
 
 instance Default InScopeSet where
@@ -123,8 +123,10 @@ runSingleTransformation rwEnv rwState is trans term = do
 -- include a type translator, evaluator, current function, or global heap. Maps,
 -- like the primitive and tycon map, are also empty. If the transformation under
 -- test needs these definitions, you should add them manually.
-runSingleTransformationDef :: Default extra => Rewrite extra -> C.Term -> IO C.Term
-runSingleTransformationDef = runSingleTransformation def def def
+runSingleTransformationDef :: Rewrite NormalizeState -> C.Term -> IO C.Term
+runSingleTransformationDef rewrite term = do
+  st <- defRewriteState
+  runSingleTransformation def st def rewrite term
 
 
 parseType :: Show l => Type l -> C.Type
