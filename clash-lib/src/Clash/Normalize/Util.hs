@@ -10,7 +10,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE RecordWildCards #-}
-{-# LANGUAGE TemplateHaskellQuotes #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 module Clash.Normalize.Util
  ( ConstantSpecInfo(..)
@@ -33,14 +33,16 @@ module Clash.Normalize.Util
  )
  where
 
+import           Control.Concurrent.Lifted (myThreadId)
 import qualified Control.Concurrent.MVar.Lifted as MVar
-import           Control.Lens            ((&),(+~),(.=))
+import           Control.Lens            ((&),(+~))
 import qualified Control.Lens            as Lens
 import           Data.Bifunctor          (bimap)
 import           Data.Either             (lefts,rights)
 import qualified Data.List               as List
 import qualified Data.List.Extra         as List
 import qualified Data.Map                as Map
+import           Data.Maybe              (fromMaybe)
 import qualified Data.HashMap.Strict     as HashMapS
 import qualified Data.HashSet            as HashSet
 import           Data.Text               (Text)
@@ -88,7 +90,7 @@ import           Clash.Rewrite.Types
 import           Clash.Rewrite.Util
   (runRewrite, mkTmBinderFor, mkDerivedName)
 import           Clash.Unique
-import           Clash.Util              (SrcSpan)
+import           Clash.Util              (SrcSpan, curLoc, noSrcSpan)
 
 -- | Determine if argument should reduce to a constant given a primitive and
 -- an argument number. Caches results.
@@ -184,8 +186,10 @@ isRecursiveBndr f = do
     case lookupVarEnv f cg of
       Just isR -> pure (cg, isR)
       Nothing -> do
-        fBodyM <- lookupVarEnv f <$> Lens.use bindings
-        case fBodyM of
+        bindingsV <- Lens.use bindings
+        mBind <- MVar.withMVar bindingsV (pure . lookupVarEnv f)
+
+        case mBind of
           Nothing -> pure (cg, False)
           Just b ->
             -- There are no global mutually-recursive functions, only self-recursive
@@ -330,7 +334,9 @@ constantSpecInfo ctx e = do
           pure (constantCsr e)
 
       (var@(Var f), args, ticks) -> do
-        (curF, _) <- Lens.use curFun
+        curFunsV <- Lens.use curFun
+        thread <- myThreadId
+        Just (curF, _) <- MVar.withMVar curFunsV (pure . HashMapS.lookup thread)
         isNonRecGlobVar <- isNonRecursiveGlobalVar e
         if isNonRecGlobVar && f /= curF then do
           csr <- mergeCsrs ctx ticks e (mkApps var) args
@@ -437,9 +443,13 @@ normalizeTopLvlBndr isTop nm (Binding nm' sp inl pr tm _) = do
       -- to avoid this.
       let tm1 = deShadowTerm emptyInScopeSet tm
           tm2 = if isTop then substWithTyEq tm1 else tm1
-      old <- Lens.use curFun
+      -- TODO Should tm3 be done async / added to the job queue when it's made?
+      curFunsV <- Lens.use curFun
+      thread <- myThreadId
+      old <- MVar.withMVar curFunsV (pure . HashMapS.lookup thread)
       tm3 <- rewriteExpr ("normalization",normalization) (nmS,tm2) (nm',sp)
-      curFun .= old
+      MVar.modifyMVar_ curFunsV $
+        pure . HashMapS.insert thread (fromMaybe (error $ $(curLoc) ++ "Report as bug: no curFun", noSrcSpan) old)
       let ty' = inferCoreTypeOf tcm tm3
       let r' = nm' `globalIdOccursIn` tm3
       let value = Binding nm'{varType = ty'} sp inl pr tm3 r'
@@ -516,7 +526,9 @@ rewriteExpr :: (String,NormRewrite) -- ^ Transformation to apply
             -> (Id, SrcSpan)        -- ^ Renew current function being rewritten
             -> NormalizeSession Term
 rewriteExpr (nrwS,nrw) (bndrS,expr) (nm, sp) = do
-  curFun .= (nm, sp)
+  curFunsV <- Lens.use curFun
+  thread <- myThreadId
+  MVar.modifyMVar_ curFunsV (pure . HashMapS.insert thread (nm, sp))
   opts <- Lens.view debugOpts
   let before = showPpr expr
   let expr' = traceIf (hasTransformationInfo FinalTerm opts)

@@ -28,17 +28,18 @@ module Clash.Normalize.Transformations.Specialize
   ) where
 
 import Control.Arrow ((***), (&&&))
+import Control.Concurrent.Lifted (myThreadId)
 import qualified Control.Concurrent.MVar.Lifted as MVar
 import Control.DeepSeq (force)
 import Control.Exception (throw)
 import qualified Control.Lens as Lens
 import qualified Control.Monad as Monad
-import Control.Monad.Extra (orM)
 import qualified Control.Monad.Writer as Writer (listen)
 import Data.Bifunctor (bimap)
 import Data.Coerce (coerce)
 import qualified Data.Either as Either
 import Data.Functor.Const (Const(..))
+import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Map.Strict as Map
 import qualified Data.Monoid as Monoid (getAny)
 import qualified Data.Set.Ordered as OSet
@@ -203,8 +204,10 @@ appProp ctx@(TransformContext is _) = \case
 
   go is0 (Lam v e) (Left arg:args) ticks = do
     setChanged
-    bndrs <- Lens.use bindings
-    orM [pure (isVar arg), isWorkFree workFreeBinders bndrs arg] >>= \case
+    bndrsV <- Lens.use bindings
+    wf <- MVar.withMVar bndrsV (\bndrs -> isWorkFree workFreeBinders bndrs arg)
+
+    case isVar arg || wf of
       True ->
         let subst = extendIdSubst (mkSubst is0) v arg in
         (`mkTicks` ticks) <$> go is0 (substTm "appProp.AppLam" subst e) args []
@@ -266,10 +269,12 @@ appProp ctx@(TransformContext is _) = \case
 
   goCaseArg isA0 ty0 ls0 (Left arg:args0) = do
     tcm <- Lens.view tcCache
-    bndrs <- Lens.use bindings
     let argTy = inferCoreTypeOf tcm arg
         ty1   = applyFunTy tcm ty0 argTy
-    orM [pure (isVar arg), isWorkFree workFreeBinders bndrs arg] >>= \case
+    bndrsV <- Lens.use bindings
+    wf <- MVar.withMVar bndrsV (\bndrs -> isWorkFree workFreeBinders bndrs arg)
+
+    case isVar arg || wf of
       True -> do
         (ty2,ls1,args1) <- goCaseArg isA0 ty1 ls0 args0
         return (ty2,ls1,Left arg:args1)
@@ -400,7 +405,8 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
       -- Create new specialized function
       Nothing -> do
         -- Determine if we can specialize f
-        bodyMaybe <- fmap (lookupUniqMap (varName f)) $ Lens.use bindings
+        bndrsV <- Lens.use bindings
+        bodyMaybe <- MVar.withMVar bndrsV (pure . lookupUniqMap (varName f))
         case bodyMaybe of
           Just (Binding _ sp inl _ bodyTm _) -> do
             -- Determine if we see a sequence of specializations on a growing argument
@@ -445,7 +451,7 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
                         -- binding @g'@ where both the body of @mealy@ and @g@
                         -- are inlined, meaning the state-transition-function
                         -- and the memory element will be in a single function.
-                        gTmM <- fmap (lookupUniqMap (varName g)) $ Lens.use bindings
+                        gTmM <- MVar.withMVar bndrsV (pure . lookupUniqMap (varName g))
                         return (g,maybe inl bindingSpec gTmM, maybe specArg (Left . (`mkApps` gArgs) . bindingTerm) gTmM)
                       else return (f,inl,specArg)
                   _ -> return (f,inl,specArg)
@@ -481,10 +487,14 @@ specialize' _ctx _ (appE,args,ticks) (Left specArg) = do
       newBody = mkAbstraction specArg specBndrs
   -- See if there's an existing binder that's alpha-equivalent to the
   -- specialized function
-  existing <- filterUniqMap ((`aeqTerm` newBody) . bindingTerm) <$> Lens.use bindings
+  bndrsV <- Lens.use bindings
+  existing <- MVar.withMVar bndrsV $ \bndrs ->
+    pure $ filterUniqMap ((`aeqTerm` newBody) . bindingTerm) bndrs
   -- Create a new function if an alpha-equivalent binder doesn't exist
   newf <- case eltsUniqMap existing of
-    [] -> do (cf,sp) <- Lens.use curFun
+    [] -> do curFunsV <- Lens.use curFun
+             thread <- myThreadId
+             Just (cf,sp) <- MVar.withMVar curFunsV (pure . HashMap.lookup thread)
              mkFunction (appendToName (varName cf) "_specF") sp NoUserInline newBody
     (b:_) -> return (bindingId b)
   -- Create specialized argument
@@ -575,7 +585,8 @@ nonRepSpec ctx e@(App e1 e2)
     inlineInternalSpecialisationArgument app
       | (Var f,fArgs,ticks) <- collectArgsTicks app
       = do
-        fTmM <- lookupVarEnv f <$> Lens.use bindings
+        bndrsV <- Lens.use bindings
+        fTmM <- MVar.withMVar bndrsV (pure . lookupVarEnv f)
         case fTmM of
           Just b
             | nameSort (varName (bindingId b)) == Internal

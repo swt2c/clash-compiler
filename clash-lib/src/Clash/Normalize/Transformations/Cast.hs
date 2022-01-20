@@ -9,9 +9,12 @@ module Clash.Normalize.Transformations.Cast
   , splitCastWork
   ) where
 
+import Control.Concurrent.Lifted (myThreadId)
+import qualified Control.Concurrent.MVar.Lifted as MVar
 import Control.Exception (throw)
 import qualified Control.Lens as Lens
 import Control.Monad.Writer (listen)
+import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Monoid as Monoid (Any(..))
 import GHC.Stack (HasCallStack)
 
@@ -58,10 +61,10 @@ argCastSpec ctx e@(App f (stripTicks -> Cast e' _ _))
  -- We can only push casts into global binders
  , (Var g, _) <- collectArgs f
  , isGlobalId g = do
-  bndrs <- Lens.use bindings
-  isWorkFree workFreeBinders bndrs e' >>= \case
-    True -> go
-    False -> warn go
+  bndrsV <- Lens.use bindings
+  wf <- MVar.withMVar bndrsV (\bndrs -> isWorkFree workFreeBinders bndrs e')
+
+  if wf then go else warn go
  where
   go = specialize ctx e
   warn = trace (unwords
@@ -96,7 +99,9 @@ elimCastCast _ c@(Cast (stripTicks -> Cast e tyA tyB) tyB' tyC) = do
   if ntyB == ntyB' && ntyA == ntyC then changed e
                                    else throwError
   where throwError = do
-          (nm,sp) <- Lens.use curFun
+          curFunsV <- Lens.use curFun
+          thread <- myThreadId
+          Just (nm,sp) <- MVar.withMVar curFunsV (pure . HashMap.lookup thread)
           throw (ClashException sp ($(curLoc) ++ showPpr nm
                   ++ ": Found 2 nested casts whose types don't line up:\n"
                   ++ showPpr c)

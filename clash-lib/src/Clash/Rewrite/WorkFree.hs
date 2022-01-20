@@ -22,7 +22,9 @@ module Clash.Rewrite.WorkFree
   , isConstantNotClockReset
   ) where
 
-import Control.Lens as Lens (Lens', use, (.=))
+import Control.Concurrent.MVar (MVar)
+import qualified Control.Concurrent.MVar.Lifted as MVar
+import Control.Lens as Lens (Lens', use)
 import Control.Monad.State.Class (MonadState)
 import Control.Monad.Trans.Control (MonadBaseControl)
 import qualified Data.Text.Extra as Text
@@ -47,17 +49,13 @@ import Clash.Normalize.Primitives (removedArg)
 {-# INLINABLE isWorkFree #-}
 isWorkFree
   :: (HasCallStack, MonadState s m, MonadBaseControl IO m)
-  => Lens' s (VarEnv Bool)
+  => Lens' s (MVar (VarEnv Bool))
   -> BindingMap
   -> Term
   -> m Bool
 isWorkFree cacheL bndrs bndr = do
-  cache <- Lens.use cacheL
-  let (cache', wf) = isWorkFreePure cache bndrs bndr
-
-  cacheL .= cache'
-  pure wf
-
+  lock <- Lens.use cacheL
+  MVar.modifyMVar lock (\cache -> pure (isWorkFreePure cache bndrs bndr))
 
 -- | Determines whether a global binder is work free. Errors if binder does
 -- not exist.

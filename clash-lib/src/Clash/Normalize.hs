@@ -24,7 +24,7 @@ import           Control.Monad                    (when)
 import           Control.Monad.State.Strict       (State)
 import           Data.Default                     (def)
 import           Data.Either                      (lefts,partitionEithers)
-import qualified Data.IntMap                      as IntMap
+import qualified Data.HashMap.Strict              as HashMap
 import           Data.List
   (intersect, mapAccumL)
 import qualified Data.Map                         as Map
@@ -114,7 +114,7 @@ runNormalization
   -> NormalizeSession a
   -- ^ NormalizeSession to run
   -> IO a
-runNormalization env supply globals typeTrans peEval eval rcsMap topEntities session = do
+runNormalization env supply globals typeTrans peEval eval rcsMap entities session = do
   normState <- NormalizeState
     <$> MVar.newMVar emptyVarEnv
     <*> MVar.newMVar Map.empty
@@ -123,25 +123,24 @@ runNormalization env supply globals typeTrans peEval eval rcsMap topEntities ses
     <*> MVar.newMVar Map.empty
     <*> MVar.newMVar rcsMap
 
-  runRewriteSession rwEnv (rwState normState) session
+  rwState <- RewriteState
+    <$> MVar.newMVar mempty
+    <*> MVar.newMVar globals
+    <*> MVar.newMVar supply
+    <*> MVar.newMVar HashMap.empty
+    <*> MVar.newMVar 0
+    <*> MVar.newMVar (mempty, 0)
+    <*> MVar.newMVar emptyVarEnv
+    <*> pure normState
+
+  runRewriteSession rwEnv rwState session
  where
   rwEnv = RewriteEnv
     { _clashEnv = env
     , _typeTranslator = typeTrans
     , _peEvaluator = peEval
     , _evaluator = eval
-    , _topEntities = mkVarSet topEntities
-    }
-
-  rwState s = RewriteState
-    { _transformCounters = mempty
-    , _bindings = globals
-    , _uniqSupply = supply
-    , _curFun = (error $ $(curLoc) ++ "Report as bug: no curFun", noSrcSpan)
-    , _nameCounter = 0
-    , _globalHeap = (IntMap.empty, 0)
-    , _workFreeBinders = emptyVarEnv
-    , _extra = s
+    , _topEntities = mkVarSet entities
     }
 
 normalize
@@ -155,7 +154,8 @@ normalize top = do
 
 normalize' :: Id -> NormalizeSession ([Id], (Id, Binding Term))
 normalize' nm = do
-  exprM <- lookupVarEnv nm <$> Lens.use bindings
+  bndrsV <- Lens.use bindings
+  exprM <- MVar.withMVar bndrsV (pure . lookupVarEnv nm)
   let nmS = showPpr (varName nm)
   case exprM of
     Just (Binding nm' sp inl pr tm r) -> do

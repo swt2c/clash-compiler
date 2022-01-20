@@ -27,15 +27,19 @@
 
 module Clash.Rewrite.Types where
 
+import Control.Applicative                   (Alternative)
+import Control.Concurrent                    (MVar, ThreadId)
+import qualified Control.Concurrent.MVar.Lifted as MVar
 import Control.Concurrent.Supply             (Supply, freshId)
 import Control.DeepSeq                       (NFData)
-import Control.Lens                          (Lens', use, (.=))
+import Control.Lens                          (Lens', use)
 import qualified Control.Lens as Lens
 import Control.Monad.Base
 #if !MIN_VERSION_base(4,13,0)
 import Control.Monad.Fail                    (MonadFail)
 #endif
 import Control.Monad.Fix                     (MonadFix)
+import Control.Monad.IO.Class                (MonadIO)
 import Control.Monad.State.Strict            (State)
 #if MIN_VERSION_transformers(0,5,6)
 import Control.Monad.Reader                  (MonadReader (..))
@@ -89,22 +93,37 @@ data RewriteStep
   -- ^ Term after `apply`
   } deriving (Show, Generic, NFData, Binary)
 
+{-
+Note [strictness in RewriteState]
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+Prior to concurrent normalization, the _bindings, _uniqSupply and _nameCounter
+all had strictness marked in the fields. However, since they are now MVar, it
+is not the field itself that needs to be strict but the contents of the MVar.
+When these are updated in rewriting, it is necessary to use `seq` or bang
+patterns to ensure that they are always forced to WHNF.
+
+Since the transform count was replaced in it's entirity with the map of
+counters, operations on the map are always forced completely with `deepseq`.
+This prevents thunks being built up on map updates, since counting the number
+of transformations applied is common when debugging.
+-}
+
 -- | State of a rewriting session
 data RewriteState extra
   = RewriteState
-  { _transformCounters :: HashMap Text Word
+  { _transformCounters :: MVar (HashMap Text Word)
   -- ^ Map that tracks how many times each transformation is applied
-  , _bindings         :: !BindingMap
+  , _bindings         :: MVar BindingMap
   -- ^ Global binders
-  , _uniqSupply       :: !Supply
+  , _uniqSupply       :: MVar Supply
   -- ^ Supply of unique numbers
-  , _curFun           :: (Id,SrcSpan) -- Initially set to undefined: no strictness annotation
-  -- ^ Function which is currently normalized
-  , _nameCounter      :: {-# UNPACK #-} !Int
+  , _curFun           :: MVar (HashMap ThreadId (Id,SrcSpan))
+  -- ^ Function which is currently normalized for each thread
+  , _nameCounter      :: MVar Int
   -- ^ Used for 'Fresh'
-  , _globalHeap       :: PrimHeap
+  , _globalHeap       :: MVar PrimHeap
   -- ^ Used as a heap for compile-time evaluation of primitives that live in I/O
-  , _workFreeBinders  :: VarEnv Bool
+  , _workFreeBinders  :: MVar (VarEnv Bool)
   -- ^ Map telling whether a binder's definition is work-free
   , _extra            :: !extra
   -- ^ Additional state
@@ -180,12 +199,15 @@ normalizeUltra = clashEnv . Lens.to (opt_ultra . envOpts)
 newtype RewriteMonad extra a = R
   { unR :: RWST RewriteEnv Any (RewriteState extra) IO a }
   deriving newtype
-    ( Applicative
+    ( Alternative
+    , Applicative
     , Functor
     , Monad
     , MonadBase IO
     , MonadBaseControl IO
+    , MonadFail
     , MonadFix
+    , MonadIO
     )
 
 -- | Run the computation in the RewriteMonad
@@ -257,10 +279,11 @@ instance (Monoid w, MonadBaseControl b m) => MonadBaseControl b (RWST r w s m) w
 
 instance MonadUnique (RewriteMonad extra) where
   getUniqueM = do
-    sup <- use uniqSupply
-    let (a,sup') = freshId sup
-    uniqSupply .= sup'
-    a `seq` return a
+    supplyV <- use uniqSupply
+
+    MVar.modifyMVar supplyV $ \s ->
+      let (!a, !s') = freshId s
+       in pure (s', a)
 
 censor :: (Any -> Any) -> RewriteMonad extra a -> RewriteMonad extra a
 censor f = R . RWS.censor f . unR
@@ -280,7 +303,7 @@ type Rewrite extra = Transform (RewriteMonad extra)
 
 -- Moved into Clash.Rewrite.WorkFree
 {-# SPECIALIZE isWorkFree
-      :: Lens' (RewriteState extra) (VarEnv Bool)
+      :: Lens' (RewriteState extra) (MVar (VarEnv Bool))
       -> BindingMap
       -> Term
       -> RewriteMonad extra Bool

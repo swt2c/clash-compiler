@@ -38,8 +38,8 @@
 
 module Clash.Normalize.PrimitiveReductions where
 
+import qualified Control.Concurrent.MVar.Lifted   as MVar
 import qualified Control.Lens                     as Lens
-import           Control.Lens                     ((.=))
 import           Data.Bifunctor                   (second)
 import           Data.List                        (mapAccumR)
 import           Data.List.Extra                  (zipEqual)
@@ -262,13 +262,16 @@ reduceReverse inScope0 n elTy vArg = do
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
     , [nilCon, consCon] <- tyConDataCons vecTc
     = do
-      uniqs0 <- Lens.use uniqSupply
-      let (uniqs1,(vars,elems)) = second (second concat . unzip)
-                                $ extractElems uniqs0 inScope0 consCon elTy 'V' n vArg
-          lbody = mkVec nilCon consCon elTy n (reverse vars)
-          lb    = Letrec (init elems) lbody
-      uniqSupply Lens..= uniqs1
+      uniqsV <- Lens.use uniqSupply
+      (vars, elems) <- MVar.modifyMVar uniqsV $ \uniqs ->
+        pure . second (second concat . unzip)
+             $ extractElems uniqs inScope0 consCon elTy 'V' n vArg
+
+      let lbody = mkVec nilCon consCon elTy n (reverse vars)
+          lb = Letrec (init elems) lbody
+
       changed lb
+
   go _ ty = error $ $(curLoc) ++ "reduceReverse: argument does not have a vector type: " ++ showPpr ty
 
 -- | Replace an application of the @Clash.Sized.Vector.zipWith@ primitive on
@@ -382,13 +385,17 @@ reduceImap (TransformContext is0 ctx) n argElTy resElTy fun arg = do
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [nilCon,consCon] <- tyConDataCons vecTc
       = do
-        uniqs0 <- Lens.use uniqSupply
         fun1 <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) fun
         let is1 = extendInScopeSetList is0 (collectTermIds fun1)
-            (uniqs1,nTv) = mkUniqSystemTyVar (uniqs0,is1) ("n",typeNatKind)
-            (uniqs2,(vars,elems)) = second (second concat . unzip)
-                                  $ uncurry extractElems uniqs1 consCon argElTy 'I' n arg
-            (Right idxTy:_,_) = splitFunForallTy (inferCoreTypeOf tcm fun)
+
+        uniqsV <- Lens.use uniqSupply
+        (nTv, vars, elems) <- MVar.modifyMVar uniqsV $ \uniqs0 ->
+          let (uniqs1,nTv) = mkUniqSystemTyVar (uniqs0,is1) ("n",typeNatKind)
+              (uniqs2,(vars,elems)) = second (second concat . unzip)
+                                    $ uncurry extractElems uniqs1 consCon argElTy 'I' n arg
+           in pure (uniqs2, (nTv, vars, elems))
+
+        let (Right idxTy:_,_) = splitFunForallTy (inferCoreTypeOf tcm fun)
             (TyConApp idxTcNm _) = tyView idxTy
             -- fromInteger# :: KnownNat n => Integer -> Index n
             idxFromIntegerTy = ForAllTy nTv
@@ -403,7 +410,6 @@ reduceImap (TransformContext is0 ctx) n argElTy resElTy fun arg = do
             funApps          = zipWith (\i v -> App (App fun1 i) v) idxs vars
             lbody            = mkVec nilCon consCon resElTy n funApps
             lb               = Letrec (init elems) lbody
-        uniqSupply Lens..= uniqs2
         changed lb
     go _ ty = error $ $(curLoc) ++ "reduceImap: argument does not have a vector type: " ++ showPpr ty
 
@@ -429,15 +435,16 @@ reduceIterateI (TransformContext is0 ctx) n aTy vTy f0 a = do
   f1 <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) f0
 
   -- Generate uniq ids for element assignments.
-  uniqs0 <- Lens.use uniqSupply
-  let
-    is1 = extendInScopeSetList is0 (collectTermIds f1)
-    ((uniqs1, _is2), elementIds) =
-      mapAccumR
-        mkUniqInternalId
-        (uniqs0, is1)
-        (zip (map (("el" <>) . showt) [1..n-1]) (repeat aTy))
-  uniqSupply .= uniqs1
+  uniqsV <- Lens.use uniqSupply
+  elementIds <- MVar.modifyMVar uniqsV $ \uniqs0 ->
+    let
+      is1 = extendInScopeSetList is0 (collectTermIds f1)
+      ((!uniqs1, _is2), elementIds) =
+        mapAccumR
+          mkUniqInternalId
+          (uniqs0, is1)
+          (zip (map (("el" <>) . showt) [1..n-1]) (repeat aTy))
+     in pure (uniqs1, elementIds)
 
   let
     TyConApp vecTcNm _ = tyView vTy
@@ -482,26 +489,33 @@ reduceTraverse (TransformContext is0 ctx) n aTy fTy bTy dict fun arg = do
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [nilCon,consCon] <- tyConDataCons vecTc
       = do
-        uniqs0 <- Lens.use uniqSupply
+        uniqsV <- Lens.use uniqSupply
         fun1 <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) fun
         let is1 = extendInScopeSetList is0 (collectTermIds fun1)
             (Just apDictTc)    = lookupUniqMap apDictTcNm tcm
             [apDictCon]        = tyConDataCons apDictTc
             (Just apDictIdTys) = dataConInstArgTys apDictCon [fTy]
-            (uniqs1,apDictIds@[functorDictId,pureId,apId,_,_,_]) =
-              mapAccumR mkUniqInternalId (uniqs0,is1)
-                (zipEqual ["functorDict","pure","ap","liftA2","apConstL","apConstR"]
-                     apDictIdTys)
 
-            (TyConApp funcDictTcNm _) = tyView (head apDictIdTys)
+        (is2, apDictIds@[functorDictId,pureId,apId,_,_,_]) <-
+          MVar.modifyMVar uniqsV $ \uniqs ->
+            let ((!uniqs', is2), apDictIds) =
+                  mapAccumR mkUniqInternalId (uniqs, is1)
+                    $ zipEqual ["functorDict","pure","ap","liftA2","apConstL","apConstR"] apDictIdTys
+             in pure (uniqs', (is2, apDictIds))
+
+        let (TyConApp funcDictTcNm _) = tyView (head apDictIdTys)
             (Just funcDictTc) = lookupUniqMap funcDictTcNm tcm
             [funcDictCon] = tyConDataCons funcDictTc
             (Just funcDictIdTys) = dataConInstArgTys funcDictCon [fTy]
-            (uniqs2,funcDicIds@[fmapId,_]) =
-              mapAccumR mkUniqInternalId uniqs1
-                (zipEqual ["fmap","fmapConst"] funcDictIdTys)
 
-            apPat    = DataPat apDictCon   [] apDictIds
+        (is3, funcDicIds@[fmapId,_]) <-
+          MVar.modifyMVar uniqsV $ \uniqs ->
+            let ((!uniqs', is3), funDictIds) =
+                  mapAccumR mkUniqInternalId (uniqs, is2)
+                    $ zipEqual ["fmap","fmapConst"] funcDictIdTys
+             in pure (uniqs', (is3, funDictIds))
+
+        let apPat    = DataPat apDictCon   [] apDictIds
             fnPat    = DataPat funcDictCon [] funcDicIds
 
             -- Extract the 'pure' function from the Applicative dictionary
@@ -522,10 +536,13 @@ reduceTraverse (TransformContext is0 ctx) n aTy fTy bTy dict fun arg = do
             fmapTm = Case (Var functorDictId) fmapTy
                           [(fnPat, Var fmapId)]
 
-            (uniqs3,(vars,elems)) = second (second concat . unzip)
-                                  $ uncurry extractElems uniqs2 consCon aTy 'T' n arg
+        (vars,elems) <- MVar.modifyMVar uniqsV $ \uniqs ->
+          let (!uniq, result) =
+                second (second concat . unzip)
+                  $ uncurry extractElems (uniqs, is3) consCon aTy 'T' n arg
+           in pure (uniq, result)
 
-            funApps = map (fun1 `App`) vars
+        let funApps = map (fun1 `App`) vars
 
             lbody   = mkTravVec vecTcNm nilCon consCon (Var (apDictIds!!1))
                                                        (Var (apDictIds!!2))
@@ -537,7 +554,6 @@ reduceTraverse (TransformContext is0 ctx) n aTy fTy bTy dict fun arg = do
                               ,((apDictIds!!2), apTm)
                               ,((funcDicIds!!0), fmapTm)
                               ] ++ init elems) lbody
-        uniqSupply Lens..= uniqs3
         changed lb
     go _ _ ty = error $ $(curLoc) ++ "reduceTraverse: argument does not have a vector type: " ++ showPpr ty
 
@@ -660,14 +676,18 @@ reduceFold (TransformContext is0 ctx) n aTy fun arg = do
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [_,consCon]  <- tyConDataCons vecTc
       = do
-        uniqs0 <- Lens.use uniqSupply
         fun1 <- constantPropagation (TransformContext is0 (AppArg Nothing:ctx)) fun
         let is1 = extendInScopeSetList is0 (collectTermIds fun1)
-            (uniqs1,(vars,elems)) = second (second concat . unzip)
-                                  $ extractElems uniqs0 is1 consCon aTy 'F' n arg
-            lbody            = foldV fun1 vars
+
+        uniqsV <- Lens.use uniqSupply
+        (vars, elems) <- MVar.modifyMVar uniqsV $ \uniqs ->
+          let (!uniq, result) =
+                second (second concat . unzip)
+                  $ extractElems uniqs is1 consCon aTy 'F' n arg
+           in pure (uniq, result)
+
+        let lbody            = foldV fun1 vars
             lb               = Letrec (init elems) lbody
-        uniqSupply Lens..= uniqs1
         changed lb
     go _ ty = error $ $(curLoc) ++ "reduceFold: argument does not have a vector type: " ++ showPpr ty
 
@@ -705,19 +725,23 @@ reduceDFold is0 n aTy fun start arg = do
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [_,consCon]  <- tyConDataCons vecTc
       = do
-        uniqs0 <- Lens.use uniqSupply
+        -- TODO: Should 'constantPropagation' be used on 'fun'? It seems to
+        -- TOOD: be used for every other function in this module.
         let is1 = extendInScopeSetList is0 (collectTermIds fun)
-            -- TODO: Should 'constantPropagation' be used on 'fun'? It seems to
-            -- TOOD: be used for every other function in this module.
-            (uniqs1,(vars,elems)) = second (second concat . unzip)
-                                  $ extractElems uniqs0 is1 consCon aTy 'D' n arg
-            (_ltv:Right snTy:_,_) = splitFunForallTy (inferCoreTypeOf tcm fun)
+
+        uniqsV <- Lens.use uniqSupply
+        (vars, elems) <- MVar.modifyMVar uniqsV $ \uniqs ->
+          let (!uniq, result) =
+                second (second concat . unzip)
+                  $ extractElems uniqs is1 consCon aTy 'D' n arg
+           in pure (uniq, result)
+
+        let (_ltv:Right snTy:_,_) = splitFunForallTy (inferCoreTypeOf tcm fun)
             (TyConApp snatTcNm _) = tyView snTy
             (Just snatTc)         = lookupUniqMap snatTcNm tcm
             [snatDc]              = tyConDataCons snatTc
             lbody = doFold (buildSNat snatDc) (n-1) vars
             lb    = Letrec (init elems) lbody
-        uniqSupply Lens..= uniqs1
         changed lb
     go _ ty = error $ $(curLoc) ++ "reduceDFold: argument does not have a vector type: " ++ showPpr ty
 
@@ -749,11 +773,14 @@ reduceHead inScope n aTy vArg = do
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [_,consCon]  <- tyConDataCons vecTc
       = do
-        uniqs0 <- Lens.use uniqSupply
-        let (uniqs1,(vars,elems)) = second (second concat . unzip)
-                                  $ extractElems uniqs0 inScope consCon aTy 'H' n vArg
-            lb = Letrec [head elems] (head vars)
-        uniqSupply Lens..= uniqs1
+        uniqsV <- Lens.use uniqSupply
+        (vars, elems) <- MVar.modifyMVar uniqsV $ \uniqs ->
+          let (!uniq, result) =
+                second (second concat . unzip)
+                  $ extractElems uniqs inScope consCon aTy 'H' n vArg
+           in pure (uniq, result)
+
+        let lb = Letrec [head elems] (head vars)
         changed lb
     go _ ty = error $ $(curLoc) ++ "reduceHead: argument does not have a vector type: " ++ showPpr ty
 
@@ -777,12 +804,15 @@ reduceTail inScope n aTy vArg = do
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [_,consCon]  <- tyConDataCons vecTc
       = do
-        uniqs0 <- Lens.use uniqSupply
-        let (uniqs1,(_,elems)) = second (second concat . unzip)
-                               $ extractElems uniqs0 inScope consCon aTy 'L' n vArg
-            b@(tB,_)     = elems !! 1
+        uniqsV <- Lens.use uniqSupply
+        elems <- MVar.modifyMVar uniqsV $ \uniqs ->
+          let (!uniq, result) =
+                second (concatMap snd)
+                  $ extractElems uniqs inScope consCon aTy 'L' n vArg
+           in pure (uniq, result)
+
+        let b@(tB,_)     = elems !! 1
             lb           = Letrec [b] (Var tB)
-        uniqSupply Lens..= uniqs1
         changed lb
     go _ ty = error $ $(curLoc) ++ "reduceTail: argument does not have a vector type: " ++ showPpr ty
 
@@ -806,11 +836,15 @@ reduceLast inScope n aTy vArg = do
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [_,consCon]  <- tyConDataCons vecTc
       = do
-        uniqs0 <- Lens.use uniqSupply
-        let (uniqs1,(_,elems)) = second unzip
-                               $ extractElems uniqs0 inScope consCon aTy 'L' n vArg
-            (tB,_)       = head (last elems)
-        uniqSupply Lens..= uniqs1
+        uniqsV <- Lens.use uniqSupply
+        elems <- MVar.modifyMVar uniqsV $ \uniqs ->
+          let (!uniq, result) =
+                second (fmap snd)
+                  $ extractElems uniqs inScope consCon aTy 'L' n vArg
+           in pure (uniq, result)
+
+        let (tB,_)       = head (last elems)
+
         case n of
          0 -> changed (TyApp (Prim NP.undefined) aTy)
          _ -> changed (Letrec (init (concat elems)) (Var tB))
@@ -874,13 +908,15 @@ reduceAppend inScope n m aTy lArg rArg = do
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [_,consCon]  <- tyConDataCons vecTc
-      = do uniqs0 <- Lens.use uniqSupply
-           let (uniqs1,(vars,elems)) = second (second concat . unzip)
-                                     $ extractElems uniqs0 inScope consCon aTy
-                                         'C' n lArg
-               lbody        = appendToVec consCon aTy rArg (n+m) vars
+      = do uniqsV <- Lens.use uniqSupply
+           (vars, elems) <- MVar.modifyMVar uniqsV $ \uniqs ->
+             let (!uniq, result) =
+                   second (second concat . unzip)
+                     $ extractElems uniqs inScope consCon aTy 'C' n lArg
+              in pure (uniq, result)
+
+           let lbody        = appendToVec consCon aTy rArg (n+m) vars
                lb           = Letrec (init elems) lbody
-           uniqSupply Lens..= uniqs1
            changed lb
     go _ ty = error $ $(curLoc) ++ "reduceAppend: argument does not have a vector type: " ++ showPpr ty
 
@@ -914,35 +950,35 @@ reduceUnconcat inScope unconcatPrimInfo n m aTy sm arg = do
             retVec = mkVec nilCon consCon innerVecTy n (replicate (fromInteger n) nilVec)
           changed retVec
         else do
-          uniqs0 <- Lens.use uniqSupply
-          let
-            (uniqs1,(vars,headsAndTails)) =
-              second (second concat . unzip)
-                     (extractElems uniqs0 inScope consCon aTy 'U' (n*m) arg)
-            -- Build a vector out of the first m elements
-            mvec = mkVec nilCon consCon aTy m (take (fromInteger m) vars)
-            -- Get the vector representing the next ((n-1)*m) elements
-            -- N.B. `extractElems (xs :: Vec 2 a)` creates:
-            -- x0  = head xs
-            -- xs0 = tail xs
-            -- x1  = head xs0
-            -- xs1 = tail xs0
-            (lbs,head -> nextVec) = splitAt ((2*fromInteger m)-1) headsAndTails
-            -- recursively call unconcat
-            nextUnconcat = mkApps (Prim unconcatPrimInfo)
-                                  [ Right (LitTy (NumTy (n-1)))
-                                  , Right (LitTy (NumTy m))
-                                  , Right aTy
-                                  , Left (Literal (NaturalLiteral (n-1)))
-                                  , Left sm
-                                  , Left (snd nextVec)
-                                  ]
-            -- let (mvec,nextVec) = splitAt sm arg
-            -- in Cons mvec (unconcat sm nextVec)
-            lBody = mkVecCons consCon innerVecTy n mvec nextUnconcat
-            lb = Letrec lbs lBody
+          uniqsV <- Lens.use uniqSupply
+          (vars, headsAndTails) <- MVar.modifyMVar uniqsV $ \uniqs ->
+            pure
+              . second (second concat . unzip)
+              $ extractElems uniqs inScope consCon aTy 'U' (n*m) arg
 
-          uniqSupply Lens..= uniqs1
+            -- Build a vector out of the first m elements
+          let mvec = mkVec nilCon consCon aTy m (take (fromInteger m) vars)
+              -- Get the vector representing the next ((n-1)*m) elements
+              -- N.B. `extractElems (xs :: Vec 2 a)` creates:
+              -- x0  = head xs
+              -- xs0 = tail xs
+              -- x1  = head xs0
+              -- xs1 = tail xs0
+              (lbs,head -> nextVec) = splitAt ((2*fromInteger m)-1) headsAndTails
+              -- recursively call unconcat
+              nextUnconcat = mkApps (Prim unconcatPrimInfo)
+                                    [ Right (LitTy (NumTy (n-1)))
+                                    , Right (LitTy (NumTy m))
+                                    , Right aTy
+                                    , Left (Literal (NaturalLiteral (n-1)))
+                                    , Left sm
+                                    , Left (snd nextVec)
+                                    ]
+              -- let (mvec,nextVec) = splitAt sm arg
+              -- in Cons mvec (unconcat sm nextVec)
+              lBody = mkVecCons consCon innerVecTy n mvec nextUnconcat
+              lb = Letrec lbs lBody
+
           changed lb
     go _ ty = error $ $(curLoc) ++ "reduceUnconcat: argument does not have a vector type: " ++ showPpr ty
 
@@ -1072,28 +1108,22 @@ reduceReplace_int is0 n aTy vTy v i newA = do
     , [nilCon,consCon] <- tyConDataCons vecTc
     = do
       -- Get data constructors of 'Int'
-      uniqs0                   <- Lens.use uniqSupply
       let iTy                   = inferCoreTypeOf tcm i
           (TyConApp iTcNm _)    = tyView iTy
           (Just iTc)            = lookupUniqMap iTcNm tcm
           [iDc]                 = tyConDataCons iTc
 
       -- Get elements from vector
-          (uniqs1,(vars,elems)) = second (second concat . unzip)
-                                $ extractElems
-                                    uniqs0
-                                    is0
-                                    consCon
-                                    aTy
-                                    'I'
-                                    n
-                                    v
+      uniqsV                   <- Lens.use uniqSupply
+      (vars, elems) <- MVar.modifyMVar uniqsV $ \uniqs ->
+        pure
+          . second (second concat . unzip)
+          $ extractElems uniqs is0 consCon aTy 'I' n v
 
       -- Replace every element with (if i == elIndex then newA else oldA)
       let replacedEls = zipWith (replace_intElement tcm iDc iTy) vars [0..]
           lbody       = mkVec nilCon consCon aTy n replacedEls
           lb          = Letrec (init elems) lbody
-      uniqSupply Lens..= uniqs1
       changed lb
   go _ ty = error $ $(curLoc) ++ "reduceReplace_int: argument does not have "
                                 ++ "a vector type: " ++ showPpr ty
@@ -1177,29 +1207,23 @@ reduceIndex_int is0 n aTy v i = do
     , [_nilCon,consCon] <- tyConDataCons vecTc
     = do
       -- Get data constructors of 'Int'
-      uniqs0                   <- Lens.use uniqSupply
       let iTy                   = inferCoreTypeOf tcm i
           (TyConApp iTcNm _)    = tyView iTy
           (Just iTc)            = lookupUniqMap iTcNm tcm
           [iDc]                 = tyConDataCons iTc
 
       -- Get elements from vector
-          (uniqs1,(vars,elems)) = second (second concat . unzip)
-                                $ extractElems
-                                    uniqs0
-                                    is0
-                                    consCon
-                                    aTy
-                                    'I'
-                                    n
-                                    v
+      uniqsV                   <- Lens.use uniqSupply
+      (vars, elems) <- MVar.modifyMVar uniqsV $ \uniqs ->
+        pure
+          . second (second concat . unzip)
+          $ extractElems uniqs is0 consCon aTy 'I' n v
 
       -- Build a right-biased tree of case-expressions
       let indexed = foldr (index_intElement tcm iDc iTy)
                               (TyApp (Prim NP.undefined) aTy)
                               (zip vars [0..])
           lb      = Letrec (init elems) indexed
-      uniqSupply Lens..= uniqs1
       changed lb
   go _ ty = error $ $(curLoc) ++ "indexReplace_int: argument does not have "
                               ++ "a vector type: " ++ showPpr ty
@@ -1225,17 +1249,18 @@ reduceDTFold inScope n aTy lrFun brFun arg = do
       | (Just vecTc) <- lookupUniqMap vecTcNm tcm
       , nameOcc vecTcNm == "Clash.Sized.Vector.Vec"
       , [_,consCon]  <- tyConDataCons vecTc
-      = do uniqs0 <- Lens.use uniqSupply
-           let (uniqs1,(vars,elems)) = second (second concat . unzip)
-                                     $ extractElems uniqs0 inScope consCon aTy
-                                         'T' (2^n) arg
-               (_ltv:Right snTy:_,_) = splitFunForallTy (inferCoreTypeOf tcm brFun)
+      = do uniqsV <- Lens.use uniqSupply
+           (vars, elems) <- MVar.modifyMVar uniqsV $ \uniqs ->
+             pure
+               . second (second concat . unzip)
+               $ extractElems uniqs inScope consCon aTy 'T' (2^n) arg
+
+           let (_ltv:Right snTy:_,_) = splitFunForallTy (inferCoreTypeOf tcm brFun)
                (TyConApp snatTcNm _) = tyView snTy
                (Just snatTc)         = lookupUniqMap snatTcNm tcm
                [snatDc]              = tyConDataCons snatTc
                lbody = doFold (buildSNat snatDc) (n-1) vars
                lb    = Letrec (init elems) lbody
-           uniqSupply Lens..= uniqs1
            changed lb
     go _ ty = error $ $(curLoc) ++ "reduceDTFold: argument does not have a vector type: " ++ showPpr ty
 
@@ -1273,15 +1298,16 @@ reduceTFold inScope n aTy lrFun brFun arg = do
       | (Just treeTc) <- lookupUniqMap treeTcNm tcm
       , nameOcc treeTcNm == "Clash.Sized.RTree.RTree"
       , [lrCon,brCon] <- tyConDataCons treeTc
-      = do uniqs0 <- Lens.use uniqSupply
-           let (uniqs1,(vars,elems)) = extractTElems uniqs0 inScope lrCon brCon aTy 'T' n arg
-               (_ltv:Right snTy:_,_) = splitFunForallTy (inferCoreTypeOf tcm brFun)
+      = do uniqsV <- Lens.use uniqSupply
+           (vars, elems) <- MVar.modifyMVar uniqsV $ \uniqs ->
+             pure $ extractTElems uniqs inScope lrCon brCon aTy 'T' n arg
+
+           let (_ltv:Right snTy:_,_) = splitFunForallTy (inferCoreTypeOf tcm brFun)
                (TyConApp snatTcNm _) = tyView snTy
                (Just snatTc)         = lookupUniqMap snatTcNm tcm
                [snatDc]              = tyConDataCons snatTc
                lbody = doFold (buildSNat snatDc) (n-1) vars
                lb    = Letrec elems lbody
-           uniqSupply Lens..= uniqs1
            changed lb
     go _ ty = error $ $(curLoc) ++ "reduceTFold: argument does not have a tree type: " ++ showPpr ty
 

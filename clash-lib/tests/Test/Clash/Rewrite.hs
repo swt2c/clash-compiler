@@ -35,7 +35,6 @@ import Control.Concurrent.Supply (newSupply)
 import Data.Default
 import Language.Haskell.Exts.Syntax
 import Language.Haskell.Exts.Parser (parseExp, fromParseResult)
-import System.IO.Unsafe (unsafePerformIO)
 import Text.Read (readMaybe)
 import GHC.Stack (HasCallStack)
 
@@ -84,16 +83,15 @@ defRewriteState = do
     <*> newMVar Map.empty
     <*> newMVar emptyVarEnv
 
-  pure RewriteState
-    { _transformCounters=mempty
-    , _bindings=emptyVarEnv
-    , _uniqSupply=unsafePerformIO newSupply
-    , _curFun=error "_curFun: NYI"
-    , _nameCounter=2
-    , _workFreeBinders=emptyVarEnv
-    , _globalHeap=error "_globalHeap: NYI"
-    , _extra=normState
-    }
+  RewriteState
+    <$> newMVar mempty
+    <*> newMVar emptyVarEnv
+    <*> (newSupply >>= newMVar)
+    <*> pure (error "_curFun: NYI")
+    <*> newMVar 2
+    <*> newMVar (error "_globalHeap: NYI")
+    <*> newMVar emptyVarEnv
+    <*> pure normState
 
 instance Default InScopeSet where
   def = emptyInScopeSet

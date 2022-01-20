@@ -26,6 +26,7 @@ module Clash.Normalize.Transformations.Case
   , elimExistentials
   ) where
 
+import qualified Control.Concurrent.MVar.Lifted as MVar
 import qualified Control.Lens as Lens
 import Control.Monad.State.Strict (evalState)
 import Data.Bifunctor (second)
@@ -237,8 +238,9 @@ caseCon' ctx@(TransformContext is0 _) e@(Case subj ty alts) = do
       -- based on the fact on whether the argument has the potential to make
       -- the circuit larger than needed if we were to duplicate that argument.
       newBinder (isN0, substN) (x, arg) = do
-        bndrs <- Lens.use bindings
-        isWorkFree workFreeBinders bndrs arg >>= \case
+        bindingsV <- Lens.use bindings
+        wf <- MVar.withMVar bindingsV (\bndrs -> isWorkFree workFreeBinders bndrs arg)
+        case wf of
           True -> pure ((isN0, (x, arg):substN), Nothing)
           False ->
             let
