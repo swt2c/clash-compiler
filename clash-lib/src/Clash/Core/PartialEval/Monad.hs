@@ -84,7 +84,7 @@ import           Clash.Core.Util (mkUniqSystemId, mkUniqSystemTyVar)
 import           Clash.Core.Var (Id, TyVar, Var)
 import           Clash.Core.VarEnv
 import           Clash.Driver.Types (Binding(..))
-import           Clash.Rewrite.WorkFree (isWorkFree)
+import           Clash.Rewrite.WorkFree (isWorkFreePure)
 
 {-
 NOTE [RWS monad]
@@ -311,7 +311,11 @@ workFreeValue :: Value -> Eval Bool
 workFreeValue = \case
   VNeutral _ -> pure False
   VThunk x _ -> do
-    bindings <- fmap (fmap asTerm) . genvBindings <$> getGlobalEnv
-    isWorkFree workFreeCache bindings x
+    env <- getGlobalEnv
+    let bindings = fmap (fmap asTerm) (genvBindings env)
+    let (cache, wf) = isWorkFreePure (genvWorkCache env) bindings x
+
+    modifyGlobalEnv (\genv -> genv { genvWorkCache = cache })
+    pure wf
 
   _ -> pure True

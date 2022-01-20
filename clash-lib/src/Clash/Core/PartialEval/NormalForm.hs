@@ -27,11 +27,9 @@ module Clash.Core.PartialEval.NormalForm
   , Normal(..)
   , LocalEnv(..)
   , GlobalEnv(..)
-  , workFreeCache
   ) where
 
 import Control.Concurrent.Supply (Supply)
-import Control.Lens (Lens', lens)
 import Data.IntMap.Strict (IntMap)
 import Data.Map.Strict (Map)
 
@@ -192,6 +190,3 @@ data GlobalEnv = GlobalEnv
     -- ^ Cache for the results of isWorkFree. This is required to use
     -- Clash.Rewrite.WorkFree.isWorkFree.
   }
-
-workFreeCache :: Lens' GlobalEnv (VarEnv Bool)
-workFreeCache = lens genvWorkCache (\env x -> env { genvWorkCache = x })
