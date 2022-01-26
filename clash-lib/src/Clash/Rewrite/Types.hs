@@ -125,6 +125,8 @@ data RewriteState extra
   -- ^ Used as a heap for compile-time evaluation of primitives that live in I/O
   , _workFreeBinders  :: MVar (VarEnv Bool)
   -- ^ Map telling whether a binder's definition is work-free
+  , _ioLock           :: MVar ()
+  -- ^ Synchronization for logging to stdout
   , _extra            :: !extra
   -- ^ Additional state
   }
@@ -252,6 +254,7 @@ instance MonadReader RewriteEnv (RewriteMonad extra) where
 #if MIN_VERSION_transformers(0,5,6) && !MIN_VERSION_transformers_base(0,4,6)
 instance (Monoid w, MonadBase b m) => MonadBase b (RWST r w s m) where
   liftBase = liftBaseDefault
+  {-# INLINE liftBase #-}
 #endif
 
 #if MIN_VERSION_transformers(0,5,6)

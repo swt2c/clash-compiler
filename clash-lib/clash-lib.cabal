@@ -130,7 +130,6 @@ Library
                       aeson-pretty            >= 0.8      && < 0.9,
                       ansi-terminal           >= 0.8.0.0  && < 0.12,
                       array,
-                      async                   >= 2.2.0    && < 2.3,
                       attoparsec              >= 0.10.4.0 && < 0.15,
                       base                    >= 4.11     && < 5,
                       base16-bytestring       >= 0.1.1    && < 1.1,
@@ -156,6 +155,7 @@ Library
                       interpolate             >= 0.2.0    && < 1.0,
                       lens                    >= 4.10     && < 5.1.0,
                       -- TODO bounds
+                      lifted-async,
                       lifted-base,
                       monad-control,
                       mtl                     >= 2.1.2    && < 2.3,

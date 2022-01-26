@@ -79,7 +79,7 @@ import Clash.Core.VarEnv
   , eltsVarEnv, emptyVarEnv, extendInScopeSetList, extendVarEnv
   , foldlWithUniqueVarEnv', lookupVarEnv, lookupVarEnvDirectly, mkVarEnv
   , notElemVarSet, unionVarEnv, unionVarEnvWith, unitVarSet, lookupVarEnv')
-import Clash.Debug (trace)
+import Clash.Debug (traceM)
 import Clash.Driver.Types (Binding(..))
 import Clash.Netlist.Util (representableType)
 import Clash.Primitives.Types
@@ -88,7 +88,7 @@ import Clash.Rewrite.Combinators (allR)
 import Clash.Rewrite.Types
   ( TransformContext(..), bindings, curFun, customReprs, tcCache, topEntities
   , typeTranslator, inlineConstantLimit, inlineFunctionLimit, inlineLimit
-  , inlineWFCacheLimit, primitives)
+  , inlineWFCacheLimit, primitives, ioLock)
 import Clash.Rewrite.Util
   ( changed, inlineBinders, inlineOrLiftBinders, isJoinPointIn
   , isUntranslatable, isUntranslatableType, isVoidWrapper, zoomExtra)
@@ -509,19 +509,24 @@ inlineNonRepWorker e@(Case scrut altsTy alts)
                                               <*> pure scrutTy)
     case (nonRepScrut, bodyMaybe) of
       (True, Just b) -> do
-        if overLimit then
-          trace ($(curLoc) ++ [I.i|
-            InlineNonRep: #{showPpr (varName f)} already inlined
-            #{limit} times in: #{showPpr (varName cf)}. The type of the subject
-            is:
+        if overLimit then do
+          ioLockV <- Lens.use ioLock
 
-              #{showPpr' def{displayTypes=True\} scrutTy}
+          MVar.withMVar ioLockV $ \() ->
+            traceM ($(curLoc) ++ [I.i|
+              InlineNonRep: #{showPpr (varName f)} already inlined
+              #{limit} times in: #{showPpr (varName cf)}. The type of the subject
+              is:
 
-            Function #{showPpr (varName cf)} will not reach a normal form and
-            compilation might fail.
+                #{showPpr' def{displayTypes=True\} scrutTy}
 
-            Run with '-fclash-inline-limit=N' to increase the inline limit to N.
-          |]) (return e)
+              Function #{showPpr (varName cf)} will not reach a normal form and
+              compilation might fail.
+
+              Run with '-fclash-inline-limit=N' to increase the inline limit to N.
+             |])
+
+          return e
         else do
           Monad.when notClassTy (zoomExtra (addNewInline f cf))
 

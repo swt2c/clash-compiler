@@ -81,13 +81,13 @@ import Clash.Core.Var (Var(..), Id, TyVar, mkTyVar)
 import Clash.Core.VarEnv
   ( InScopeSet, extendInScopeSet, extendInScopeSetList, lookupVarEnv
   , mkInScopeSet, mkVarSet, unionInScope, elemVarSet)
-import Clash.Debug (traceIf, traceM)
+import Clash.Debug (traceM, traceWhen)
 import Clash.Driver.Types (Binding(..), TransformationInfo(..), hasTransformationInfo)
 import Clash.Netlist.Util (representableType)
 import Clash.Rewrite.Combinators (topdownR)
 import Clash.Rewrite.Types
   ( TransformContext(..), bindings, censor, curFun, customReprs, extra, tcCache
-  , typeTranslator, workFreeBinders, debugOpts, topEntities, specializationLimit)
+  , typeTranslator, workFreeBinders, debugOpts, topEntities, specializationLimit, ioLock)
 import Clash.Rewrite.Util
   ( mkBinderFor, mkDerivedName, mkFunction, mkTmBinderFor, setChanged, changed
   , normalizeTermTypes, normalizeId)
@@ -360,24 +360,29 @@ specialize'
 specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
   opts <- Lens.view debugOpts
   tcm <- Lens.view tcCache
+  ioLockV <- Lens.use ioLock
 
   -- Don't specialize TopEntities
   topEnts <- Lens.view topEntities
   if f `elemVarSet` topEnts
-  then do
+  then
     case specArgIn of
       Left _ -> do
-        traceM ("Not specializing TopEntity: " ++ showPpr (varName f))
+        MVar.withMVar ioLockV $ \() ->
+          traceM ("Not specializing TopEntity: " ++ showPpr (varName f))
+
         return e
-      Right tyArg ->
-        traceIf (hasTransformationInfo AppliedTerm opts) ("Dropping type application on TopEntity: " ++ showPpr (varName f) ++ "\ntype:\n" ++ showPpr tyArg) $
+      Right tyArg -> do
+        MVar.withMVar ioLockV $ \() ->
+          traceWhen (hasTransformationInfo AppliedTerm opts)
+            ("Dropping type application on TopEntity: " ++ showPpr (varName f) ++ "\ntype:\n" ++ showPpr tyArg)
         -- TopEntities aren't allowed to be semantically polymorphic.
         -- But using type equality constraints they may be syntactically polymorphic.
         -- > topEntity :: forall dom . (dom ~ "System") => Signal dom Bool -> Signal dom Bool
         -- The TyLam's in the body will have been removed by 'Clash.Normalize.Util.substWithTyEq'.
         -- So we drop the TyApp ("specializing" on it) and change the varType to match.
         let newVarTy = piResultTy tcm (coreTypeOf f) tyArg
-        in  changed (mkApps (mkTicks (Var f{varType = newVarTy}) ticks) args)
+        changed (mkApps (mkTicks (Var f{varType = newVarTy}) ticks) args)
   else do -- NondecreasingIndentation
 
   let specArg = bimap (normalizeTermTypes tcm) (normalizeType tcm) specArgIn
@@ -397,11 +402,13 @@ specialize' (TransformContext is0 _) e (Var f, args, ticks) specArgIn = do
   MVar.modifyMVar specCacheV $ \specCache ->
     case Map.lookup (f, argLen, specAbs) specCache of
       -- Use previously specialized function
-      Just f' ->
-        traceIf (hasTransformationInfo AppliedTerm opts)
-          ("Using previous specialization of " ++ showPpr (varName f) ++ " on " ++
-            (either showPpr showPpr) specAbs ++ ": " ++ showPpr (varName f')) $
-          changed (specCache, mkApps (mkTicks (Var f') ticks) (args ++ specVars))
+      Just f' -> do
+        MVar.withMVar ioLockV $ \() ->
+          traceWhen (hasTransformationInfo AppliedTerm opts)
+            ("Using previous specialization of " ++ showPpr (varName f) ++ " on " ++
+              (either showPpr showPpr) specAbs ++ ": " ++ showPpr (varName f'))
+
+        changed (specCache, mkApps (mkTicks (Var f') ticks) (args ++ specVars))
       -- Create new specialized function
       Nothing -> do
         -- Determine if we can specialize f

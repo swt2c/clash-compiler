@@ -91,6 +91,7 @@ defRewriteState = do
     <*> newMVar 2
     <*> newMVar (error "_globalHeap: NYI")
     <*> newMVar emptyVarEnv
+    <*> newMVar ()
     <*> pure normState
 
 instance Default InScopeSet where

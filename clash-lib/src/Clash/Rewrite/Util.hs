@@ -149,7 +149,10 @@ apply
   -> Rewrite extra
 apply = \s rewrite ctx expr0 -> do
   opts <- Lens.view debugOpts
-  traceIf (hasDebugInfo TryName s opts) ("Trying: " <> s) (pure ())
+  ioLockV <- Lens.use ioLock
+
+  MVar.withMVar ioLockV $ \() ->
+    traceWhen (hasDebugInfo TryName s opts) ("Trying: " <> s)
 
   (!expr1,anyChanged) <- Writer.listen (rewrite ctx expr0)
   let hasChanged = Monoid.getAny anyChanged
@@ -167,16 +170,20 @@ apply = \s rewrite ctx expr0 -> do
     MVar.withMVar curFunsV $ \curFuns ->
       case fst <$> HashMap.lookup thread curFuns of
         Just curBndr ->
-          Monad.liftIO
-            . BS.appendFile (fromJust rewriteHistFile)
-            . BL.toStrict
-            $ encode RewriteStep
-                       { t_ctx    = tfContext ctx
-                       , t_name   = s
-                       , t_bndrS  = showPpr (varName curBndr)
-                       , t_before = expr0
-                       , t_after  = expr1
-                       }
+          -- TODO Although we're locking access to the history file, entries
+          -- may still be written to it interleaved by entity. I'm not sure if
+          -- clash-term can handle this correctly...
+          MVar.withMVar ioLockV $ \() ->
+            Monad.liftIO
+              . BS.appendFile (fromJust rewriteHistFile)
+              . BL.toStrict
+              $ encode RewriteStep
+                         { t_ctx    = tfContext ctx
+                         , t_name   = s
+                         , t_bndrS  = showPpr (varName curBndr)
+                         , t_before = expr0
+                         , t_after  = expr1
+                         }
 
         Nothing ->
           error "apply: Normalizing from an unknown thread"
@@ -214,7 +221,12 @@ applyDebug name exprOld hasChanged exprNew = do
      | otherwise ->
          go counters (pred nTrans) opts
  where
-  go counters nTrans opts = traceIf (hasDebugInfo TryTerm name opts) ("Tried: " ++ name ++ " on:\n" ++ before) $ do
+  go counters nTrans opts = do
+    ioLockV <- Lens.use ioLock
+
+    MVar.withMVar ioLockV $ \() ->
+      traceWhen (hasDebugInfo TryTerm name opts) ("Tried: " ++ name ++ " on:\n" ++ before)
+
     countersV <- Lens.use transformCounters
 
     Monad.when (dbg_countTransformations opts && hasChanged) $
@@ -272,12 +284,14 @@ applyDebug name exprOld hasChanged exprNew = do
       error $ $(curLoc) ++ "Expression changed without notice(" ++ name ++  "): before"
                         ++ before ++ "\nafter:\n" ++ after
 
-    traceIf (hasDebugInfo AppliedName name opts && hasChanged) (name <> " {" <> show nTrans <> "}") $
-      traceIf (hasDebugInfo AppliedTerm name opts && hasChanged) ("Changes when applying rewrite to:\n"
-                        ++ before ++ "\nResult:\n" ++ after ++ "\n") $
-        traceIf (hasDebugInfo TryTerm name opts && not hasChanged) ("No changes when applying rewrite "
-                          ++ name ++ " to:\n" ++ after ++ "\n") $
-          return exprNew
+    MVar.withMVar ioLockV $ \() -> do
+      traceWhen (hasDebugInfo AppliedName name opts && hasChanged) (name <> " {" <> show nTrans <> "}")
+      traceWhen (hasDebugInfo AppliedTerm name opts && hasChanged)
+        ("Changes when applying rewrite to:\n" ++ before ++ "\nResult:\n" ++ after ++ "\n")
+      traceWhen (hasDebugInfo TryTerm name opts && not hasChanged)
+        ("No changes when applying rewrite " ++ name ++ " to:\n" ++ after ++ "\n")
+
+    return exprNew
    where
     before = showPpr exprOld
     after  = showPpr exprNew
@@ -301,12 +315,14 @@ runRewriteSession :: RewriteEnv
                   -> IO a
 runRewriteSession r s m = do
   (a, s', _) <- runR m r s
-  MVar.withMVar (s' ^. transformCounters) $ \counters ->
-    traceIf (dbg_countTransformations (opt_debug (envOpts (_clashEnv r))))
-      ("Clash: Transformations:\n" ++ Text.unpack (showCounters counters)) $
-      traceIf (None < dbg_transformationInfo (opt_debug (envOpts (_clashEnv r))))
+  MVar.withMVar (s' ^. transformCounters) $ \counters -> do
+    MVar.withMVar (s' ^. ioLock) $ \() -> do
+      traceWhen (dbg_countTransformations (opt_debug (envOpts (_clashEnv r))))
+        ("Clash: Transformations:\n" ++ Text.unpack (showCounters counters))
+      traceWhen (None < dbg_transformationInfo (opt_debug (envOpts (_clashEnv r))))
         ("Clash: Applied " ++ show (sum counters) ++ " transformations")
-        pure a
+
+    pure a
   where
     showCounters =
       Text.unlines

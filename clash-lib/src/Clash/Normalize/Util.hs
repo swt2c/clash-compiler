@@ -77,7 +77,7 @@ import           Clash.Core.Var          (Id, TyVar, Var (..), isGlobalId)
 import           Clash.Core.VarEnv
   (VarEnv, emptyInScopeSet, emptyVarEnv, extendVarEnv, extendVarEnvWith,
    lookupVarEnv, unionVarEnvWith, unitVarEnv, extendInScopeSetList, mkInScopeSet, mkVarSet)
-import           Clash.Debug             (traceIf)
+import           Clash.Debug             (traceWhen)
 import           Clash.Driver.Types
   (BindingMap, Binding(..), TransformationInfo(FinalTerm), hasTransformationInfo)
 import           Clash.Normalize.Primitives (removedArg)
@@ -86,7 +86,7 @@ import           Clash.Normalize.Types
 import           Clash.Primitives.Util   (constantArgs)
 import           Clash.Rewrite.Types
   (RewriteMonad, TransformContext(..), bindings, curFun, debugOpts, extra,
-   tcCache, primitives)
+   tcCache, primitives, ioLock)
 import           Clash.Rewrite.Util
   (runRewrite, mkTmBinderFor, mkDerivedName)
 import           Clash.Unique
@@ -530,15 +530,19 @@ rewriteExpr (nrwS,nrw) (bndrS,expr) (nm, sp) = do
   thread <- myThreadId
   MVar.modifyMVar_ curFunsV (pure . HashMapS.insert thread (nm, sp))
   opts <- Lens.view debugOpts
-  let before = showPpr expr
-  let expr' = traceIf (hasTransformationInfo FinalTerm opts)
-                (bndrS ++ " before " ++ nrwS ++ ":\n\n" ++ before ++ "\n")
-                expr
-  rewritten <- runRewrite nrwS emptyInScopeSet nrw expr'
-  let after = showPpr rewritten
-  traceIf (hasTransformationInfo FinalTerm opts)
-    (bndrS ++ " after " ++ nrwS ++ ":\n\n" ++ after ++ "\n") $
-    return rewritten
+  ioLockV <- Lens.use ioLock
+
+  MVar.withMVar ioLockV $ \() ->
+    traceWhen (hasTransformationInfo FinalTerm opts)
+      (bndrS ++ " before " ++ nrwS ++ ":\n\n" ++ showPpr expr ++ "\n")
+
+  rewritten <- runRewrite nrwS emptyInScopeSet nrw expr
+
+  MVar.withMVar ioLockV $ \() ->
+    traceWhen (hasTransformationInfo FinalTerm opts)
+      (bndrS ++ " after " ++ nrwS ++ ":\n\n" ++ showPpr rewritten ++ "\n")
+
+  return rewritten
 
 -- | A tick to prefix an inlined expression with it's original name.
 -- For example, given
