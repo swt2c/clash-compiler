@@ -107,7 +107,7 @@ import           Control.Lens.Internal.TH     (bndrName)
 class NFDataX a => AutoReg a where
   -- | For documentation see class 'AutoReg'.
   --
-  -- This is version with explicit clock/reset/enable,
+  -- This is version with explicit clock\/reset\/enable,
   -- "Clash.Prelude" exports an implicit version of this: 'Clash.Prelude.autoReg'
   autoReg
     :: (HasCallStack, KnownDomain dom)

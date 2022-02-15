@@ -4,7 +4,9 @@
 {-# LANGUAGE UndecidableInstances #-}
 
 module Clash.Num.Overflowing
-  ( Overflowing(fromOverflowing, hasOverflowed)
+  ( Overflowing
+  , fromOverflowing
+  , hasOverflowed
   , toOverflowing
   , clearOverflow
   ) where
@@ -31,7 +33,9 @@ import Clash.XException (NFDataX, ShowX)
 --
 data Overflowing a = Overflowing
   { fromOverflowing :: a
+    -- ^ Retrieve the value
   , hasOverflowed :: Bool
+    -- ^ 'True' when a computation has overflowed
   }
   deriving stock (Generic, Show)
   deriving anyclass (Binary, Hashable, NFData, NFDataX, ShowX)
