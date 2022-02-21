@@ -12,7 +12,8 @@ Synchronizer circuits for safe clock domain crossings
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE TypeFamilies #-}
 
-{-# LANGUAGE Safe #-}
+-- {-# LANGUAGE Safe #-}
+{-# LANGUAGE Trustworthy #-}
 
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.Normalise       #-}
 {-# OPTIONS_GHC -fplugin GHC.TypeLits.KnownNat.Solver #-}
@@ -25,6 +26,8 @@ module Clash.Explicit.Synchronizer
     dualFlipFlopSynchronizer
     -- * Word-synchronizers
   , asyncFIFOSynchronizer
+  , myPack
+  , myUnpack
   )
 where
 
@@ -32,19 +35,23 @@ import Data.Bits                   (complement, shiftR, xor)
 import Data.Constraint             ((:-)(..), Dict (..))
 import Data.Constraint.Nat         (leTrans)
 import Data.Maybe                  (isJust)
+import Data.Typeable               (Typeable)
 import GHC.TypeLits                (type (+), type (-), type (<=), type (^), KnownNat)
 
-import Clash.Class.BitPack         (boolToBV, unpack)
+import Clash.Class.BitPack         (BitPack(..), BitSize, boolToBV, unpack)
 import Clash.Class.Resize          (truncateB)
 import Clash.Class.BitPack.BitIndex (slice)
 import Clash.Explicit.Mealy        (mealyB)
 import Clash.Explicit.BlockRam     (RamOp (..), trueDualPortBlockRam)
 import Clash.Explicit.Signal
   (Clock, Reset, Signal, Enable, register, unsafeSynchronizer, fromEnable, (.&&.))
-import Clash.Promoted.Nat          (SNat (..))
-import Clash.Promoted.Nat.Literals (d0)
+import Clash.Promoted.Nat          (compareSNat, SNat (..), SNatLE(..))
+import Clash.Promoted.Nat.Literals (d0, d1)
 import Clash.Signal                (mux, KnownDomain)
+import Clash.Signal.Trace
 import Clash.Sized.BitVector       (BitVector, (++#))
+import Clash.Sized.Index           (Index)
+import Clash.Sized.Internal.BitVector (undefined#)
 import Clash.XException            (NFDataX, fromJustX)
 
 -- * Dual flip-flop synchronizer
@@ -94,13 +101,59 @@ dualFlipFlopSynchronizer clk1 clk2 rst en i =
     . register clk2 rst en i
     . unsafeSynchronizer clk1 clk2
 
+{-
+instance (KnownNat n, 1 <= n, BitPack a) => BitPack (RamOp n a) where
+  type BitSize (RamOp n a) = 2 + BitSize (Index n) + BitSize a
+  pack = undefined
+  unpack = undefined
+-}
+
+myPack
+  :: (KnownNat n, 1 <= n, BitPack a)
+  => RamOp n a
+  -> BitVector (2 + BitSize (Index n) + BitSize a)
+myPack x = pack (op, addr, val)
+ where
+  op :: BitVector 2
+  (op, addr, val) =
+    case x of
+      (RamRead addr0) -> (0, pack addr0, undefined#)
+      (RamWrite addr0 val0) -> (1, pack addr0, pack val0)
+      RamNoOp -> (2, undefined#, undefined#)
+
+myUnpack
+  :: forall n a
+   . (KnownNat n, 1 <= n, BitPack a)
+  => BitVector (2 + BitSize (Index n) + BitSize a)
+  -> RamOp n a
+myUnpack x =
+  case op of
+    0 -> RamRead addr
+    1 -> RamWrite addr val
+    _ -> RamNoOp
+ where
+  op :: BitVector 2
+  (op, addr, val) = unpack x
+
 -- * Asynchronous FIFO synchronizer
+
+tracePort
+  :: forall n a dom
+   . (KnownDomain dom, KnownNat n, BitPack a)
+  => String
+  -> Signal dom (RamOp n a)
+  -> Signal dom (RamOp n a)
+tracePort name = case compareSNat (SNat @n) d1 of
+  SNatLE -> undefined
+  SNatGT -> fmap myUnpack . traceSignal name . fmap myPack
 
 fifoMem
   :: forall wdom rdom a addrSize
    . ( KnownDomain wdom
      , KnownDomain rdom
      , NFDataX a
+     , BitPack a
+     , Typeable a
      , KnownNat addrSize
      , 1 <= addrSize )
   => Clock wdom
@@ -113,9 +166,11 @@ fifoMem
   -> Signal wdom (Maybe a)
   -> Signal rdom a
 fifoMem wclk rclk wen ren full raddr waddr wdataM =
-  fst $ trueDualPortBlockRam
-    rclk wclk portA portB
+   traceSignal "Aout" out
  where
+   out = fst $ trueDualPortBlockRam rclk wclk portA0 portB0
+   portA0 = tracePort "Aop" portA
+   portB0 = tracePort "Bop" portB
    portA :: Signal rdom (RamOp (2 ^ addrSize) a)
    portA = mux (fromEnable ren)
                (RamRead . unpack <$> raddr)
@@ -206,6 +261,8 @@ asyncFIFOSynchronizer
   :: ( KnownDomain wdom
      , KnownDomain rdom
      , 2 <= addrSize
+     , BitPack a
+     , Typeable a
      , NFDataX a )
   => SNat addrSize
   -- ^ Size of the internally used addresses, the  FIFO contains @2^addrSize@

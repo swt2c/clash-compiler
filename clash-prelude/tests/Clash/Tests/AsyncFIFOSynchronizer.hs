@@ -5,9 +5,11 @@
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-# OPTIONS_GHC -Wno-unused-top-binds #-}
 
-module Clash.Tests.AsyncFIFOSynchronizer (tests) where
+-- module Clash.Tests.AsyncFIFOSynchronizer (tests) where
+module Clash.Tests.AsyncFIFOSynchronizer where
 
 import Data.Maybe (isJust, catMaybes)
+import Data.Text.IO (writeFile)
 import qualified Prelude as P
 
 import Hedgehog as H
@@ -17,7 +19,7 @@ import Test.Tasty
 import Test.Tasty.Hedgehog
 import Test.Tasty.HUnit
 
-import Clash.Explicit.Prelude
+import Clash.Explicit.Prelude hiding (writeFile)
 
 createDomain vSystem{vName = "Slow", vPeriod = 2 * vPeriod vSystem}
 
@@ -1150,3 +1152,16 @@ tests = testGroup "asyncFIFOSynchronizer"
   , testCase "Test 6.7 Write" test6W7
   , testProperty "Functional test" $ forAllNamedTestProperties fifoFunctionalTestCombinations
   ]
+
+main :: IO ()
+main = do
+  let f = fmap maybeHasX $ fst $ fifoOperations @C @A [] [Write, Write]
+  vcd <- dumpVCD (0, 2000) f
+           [ "Aout"
+           , "Aop"
+           , "Bop"
+           ]
+  case vcd of
+    Left msg -> fail msg
+    Right d -> writeFile "fifo.vcd" d
+  putStrLn "Written file 'fifo.vcd'"
