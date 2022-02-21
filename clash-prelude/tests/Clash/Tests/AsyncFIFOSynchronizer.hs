@@ -8,7 +8,6 @@
 module Clash.Tests.AsyncFIFOSynchronizer (tests) where
 
 import Data.Maybe (isJust, catMaybes)
-import Data.String (fromString)
 import qualified Prelude as P
 
 import Hedgehog as H
@@ -1149,5 +1148,5 @@ tests = testGroup "asyncFIFOSynchronizer"
   , testCase "Test 5.7 Write" test5W7
   , testCase "Test 6.7 Read" test6R7
   , testCase "Test 6.7 Write" test6W7
-  , testProperty "FIFO Functional test" $ forAllNamedTestProperties fifoFunctionalTestCombinations
+  , testProperty "Functional test" $ forAllNamedTestProperties fifoFunctionalTestCombinations
   ]
