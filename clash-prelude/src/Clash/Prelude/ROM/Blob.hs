@@ -93,7 +93,7 @@ asyncRomBlobPow2
 asyncRomBlobPow2 = asyncRomBlob
 {-# INLINE asyncRomBlobPow2 #-}
 
--- | asyncROM primitive
+-- | asyncRomBlob primitive
 asyncRomBlob#
   :: forall m n
    . MemBlob n m

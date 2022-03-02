@@ -18,7 +18,7 @@ BIT  = '0'
 @
 
 Consecutive @LINE@s correspond to consecutive memory addresses starting at @0@.
-For example, a data file @memory.bin@ containing the 9-bit unsigned number
+For example, a data file @memory.bin@ containing the 9-bit unsigned numbers
 @7@ to @13@ looks like:
 
 @
@@ -37,7 +37,7 @@ Such a file can be produced with 'memFile':
 writeFile "memory.bin" (memFile Nothing [7 :: Unsigned 9 .. 13])
 @
 
-We can instantiate a synchronous ROM using the content of the above file like
+We can instantiate a synchronous ROM using the content of the file above like
 so:
 
 @
@@ -112,14 +112,15 @@ import           Clash.Sized.Unsigned         (Unsigned)
 -- code-generation backends and hardware targets. Please check the support table
 -- below:
 --
---     @
---                    | VHDL     | Verilog  | SystemVerilog |
---     ===============+==========+==========+===============+
---     Altera/Quartus | Broken   | Works    | Works         |
---     Xilinx/ISE     | Works    | Works    | Works         |
---     ASIC           | Untested | Untested | Untested      |
---     ===============+==========+==========+===============+
---     @
+-- +----------------+----------+----------+---------------+
+-- |                | VHDL     | Verilog  | SystemVerilog |
+-- +================+==========+==========+===============+
+-- | Altera/Quartus | Broken   | Works    | Works         |
+-- +----------------+----------+----------+---------------+
+-- | Xilinx/ISE     | Works    | Works    | Works         |
+-- +----------------+----------+----------+---------------+
+-- | ASIC           | Untested | Untested | Untested      |
+-- +----------------+----------+----------+---------------+
 --
 -- Additional helpful information:
 --
@@ -155,9 +156,9 @@ asyncRomFile
   -> FilePath
   -- ^ File describing the content of the ROM
   -> addr
-  -- ^ Read address @rd@
+  -- ^ Read address @r@
   -> BitVector m
-  -- ^ The value of the ROM at address @rd@
+  -- ^ The value of the ROM at address @r@
 asyncRomFile sz file = asyncRomFile# sz file . fromEnum
 -- Leave 'asyncRomFile#' eta-reduced, see Note [Eta-reduction and unsafePerformIO initMem]
 {-# INLINE asyncRomFile #-}
@@ -196,14 +197,15 @@ asyncRomFile sz file = asyncRomFile# sz file . fromEnum
 -- code-generation backends and hardware targets. Please check the support table
 -- below:
 --
---     @
---                    | VHDL     | Verilog  | SystemVerilog |
---     ===============+==========+==========+===============+
---     Altera/Quartus | Broken   | Works    | Works         |
---     Xilinx/ISE     | Works    | Works    | Works         |
---     ASIC           | Untested | Untested | Untested      |
---     ===============+==========+==========+===============+
---     @
+-- +----------------+----------+----------+---------------+
+-- |                | VHDL     | Verilog  | SystemVerilog |
+-- +================+==========+==========+===============+
+-- | Altera/Quartus | Broken   | Works    | Works         |
+-- +----------------+----------+----------+---------------+
+-- | Xilinx/ISE     | Works    | Works    | Works         |
+-- +----------------+----------+----------+---------------+
+-- | ASIC           | Untested | Untested | Untested      |
+-- +----------------+----------+----------+---------------+
 --
 -- Additional helpful information:
 --
@@ -231,13 +233,13 @@ asyncRomFilePow2
   => FilePath
   -- ^ File describing the content of the ROM
   -> Unsigned n
-  -- ^ Read address @rd@
+  -- ^ Read address @r@
   -> BitVector m
-  -- ^ The value of the ROM at address @rd@
+  -- ^ The value of the ROM at address @r@
 asyncRomFilePow2 = asyncRomFile (pow2SNat (SNat @n))
 {-# INLINE asyncRomFilePow2 #-}
 
--- | asyncROMFile primitive
+-- | asyncRomFile primitive
 asyncRomFile#
   :: KnownNat m
   => SNat n
@@ -245,9 +247,9 @@ asyncRomFile#
   -> FilePath
   -- ^ File describing the content of the ROM
   -> Int
-  -- ^ Read address @rd@
+  -- ^ Read address @r@
   -> BitVector m
-  -- ^ The value of the ROM at address @rd@
+  -- ^ The value of the ROM at address @r@
 asyncRomFile# sz file = (content !) -- Leave "(content !)" eta-reduced, see
   where                             -- Note [Eta-reduction and unsafePerformIO initMem]
     mem     = unsafePerformIO (initMem file)
@@ -265,14 +267,15 @@ asyncRomFile# sz file = (content !) -- Leave "(content !)" eta-reduced, see
 -- code-generation backends and hardware targets. Please check the support table
 -- below:
 --
---     @
---                    | VHDL     | Verilog  | SystemVerilog |
---     ===============+==========+==========+===============+
---     Altera/Quartus | Broken   | Works    | Works         |
---     Xilinx/ISE     | Works    | Works    | Works         |
---     ASIC           | Untested | Untested | Untested      |
---     ===============+==========+==========+===============+
---     @
+-- +----------------+----------+----------+---------------+
+-- |                | VHDL     | Verilog  | SystemVerilog |
+-- +================+==========+==========+===============+
+-- | Altera/Quartus | Broken   | Works    | Works         |
+-- +----------------+----------+----------+---------------+
+-- | Xilinx/ISE     | Works    | Works    | Works         |
+-- +----------------+----------+----------+---------------+
+-- | ASIC           | Untested | Untested | Untested      |
+-- +----------------+----------+----------+---------------+
 --
 -- Additional helpful information:
 --
@@ -292,9 +295,9 @@ romFile
   -> FilePath
   -- ^ File describing the content of the ROM
   -> Signal dom addr
-  -- ^ Read address @rd@
+  -- ^ Read address @r@
   -> Signal dom (BitVector m)
-  -- ^ The value of the ROM at address @rd@ from the previous clock cycle
+  -- ^ The value of the ROM at address @r@ from the previous clock cycle
 romFile = hideEnable (hideClock E.romFile)
 {-# INLINE romFile #-}
 
@@ -307,14 +310,15 @@ romFile = hideEnable (hideClock E.romFile)
 -- code-generation backends and hardware targets. Please check the support table
 -- below:
 --
---     @
---                    | VHDL     | Verilog  | SystemVerilog |
---     ===============+==========+==========+===============+
---     Altera/Quartus | Broken   | Works    | Works         |
---     Xilinx/ISE     | Works    | Works    | Works         |
---     ASIC           | Untested | Untested | Untested      |
---     ===============+==========+==========+===============+
---     @
+-- +----------------+----------+----------+---------------+
+-- |                | VHDL     | Verilog  | SystemVerilog |
+-- +================+==========+==========+===============+
+-- | Altera/Quartus | Broken   | Works    | Works         |
+-- +----------------+----------+----------+---------------+
+-- | Xilinx/ISE     | Works    | Works    | Works         |
+-- +----------------+----------+----------+---------------+
+-- | ASIC           | Untested | Untested | Untested      |
+-- +----------------+----------+----------+---------------+
 --
 -- Additional helpful information:
 --
@@ -332,8 +336,8 @@ romFilePow2
   => FilePath
   -- ^ File describing the content of the ROM
   -> Signal dom (Unsigned n)
-  -- ^ Read address @rd@
+  -- ^ Read address @r@
   -> Signal dom (BitVector m)
-  -- ^ The value of the ROM at address @rd@ from the previous clock cycle
+  -- ^ The value of the ROM at address @r@ from the previous clock cycle
 romFilePow2 = hideEnable (hideClock E.romFilePow2)
 {-# INLINE romFilePow2 #-}

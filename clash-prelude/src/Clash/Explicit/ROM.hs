@@ -49,7 +49,7 @@ import Clash.XException       (deepErrorX, seqX, NFDataX)
 -- Additional helpful information:
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Explicit.BlockRam#usingrams"
--- for ideas on how to use ROMs and RAMs
+-- for ideas on how to use ROMs and RAMs.
 -- * A large 'Vec' for the content might be too inefficient, depending on how it
 -- is constructed. See 'Clash.Explicit.ROM.File.romFilePow2' and
 -- 'Clash.Explicit.ROM.Blob.romBlobPow2' for different approaches that scale
@@ -59,15 +59,15 @@ romPow2
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
-  -- ^ Global enable
+  -- ^ 'Enable' line
   -> Vec (2^n) a
   -- ^ ROM content
   --
-  -- __NB:__ must be a constant
+  -- __NB__: __MUST__ be a constant
   -> Signal dom (Unsigned n)
-  -- ^ Read address @rd@
+  -- ^ Read address @r@
   -> Signal dom a
-  -- ^ The value of the ROM at address @rd@
+  -- ^ The value of the ROM at address @r@ from the previous clock cycle
 romPow2 = rom
 {-# INLINE romPow2 #-}
 
@@ -80,7 +80,7 @@ romPow2 = rom
 -- Additional helpful information:
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Explicit.BlockRam#usingrams"
--- for ideas on how to use ROMs and RAMs
+-- for ideas on how to use ROMs and RAMs.
 -- * A large 'Vec' for the content might be too inefficient, depending on how it
 -- is constructed. See 'Clash.Explicit.ROM.File.romFile' and
 -- 'Clash.Explicit.ROM.Blob.romBlob' for different approaches that scale well.
@@ -89,15 +89,15 @@ rom
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
-  -- ^ Global enable
+  -- ^ 'Enable' line
   -> Vec n a
   -- ^ ROM content, also determines the size, @n@, of the ROM
   --
-  -- __NB:__ must be a constant
+  -- __NB__: __MUST__ be a constant
   -> Signal dom addr
-  -- ^ Read address @rd@
+  -- ^ Read address @r@
   -> Signal dom a
-  -- ^ The value of the ROM at address @rd@ from the previous clock cycle
+  -- ^ The value of the ROM at address @r@ from the previous clock cycle
 rom = \clk en content rd -> rom# clk en content (fromEnum <$> rd)
 {-# INLINE rom #-}
 
@@ -108,11 +108,11 @@ rom#
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
-  -- ^ Global enable
+  -- ^ 'Enable' line
   -> Vec n a
   -- ^ ROM content, also determines the size, @n@, of the ROM
   --
-  -- __NB:__ must be a constant
+  -- __NB__: __MUST__ be a constant
   -> Signal dom Int
   -- ^ Read address @rd@
   -> Signal dom a

@@ -60,7 +60,7 @@ import Clash.XException (deepErrorX, seqX)
 -- Additional helpful information:
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and
--- "Clash.Explicit.BlockRam#usingrams" for ideas on how to use ROMs and RAMs
+-- "Clash.Explicit.BlockRam#usingrams" for ideas on how to use ROMs and RAMs.
 romBlob
   :: forall dom addr m n
    . ( KnownDomain dom
@@ -90,7 +90,7 @@ romBlob = \clk en content rd -> romBlob# clk en content (fromEnum <$> rd)
 -- Additional helpful information:
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and
--- "Clash.Explicit.BlockRam#usingrams" for ideas on how to use ROMs and RAMs
+-- "Clash.Explicit.BlockRam#usingrams" for ideas on how to use ROMs and RAMs.
 romBlobPow2
   :: forall dom m n
    . ( KnownDomain dom
