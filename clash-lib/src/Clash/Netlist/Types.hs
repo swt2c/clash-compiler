@@ -740,9 +740,11 @@ data TemplateFunction where
     -> TemplateFunction
 
 instance Show BlackBox where
-  show (BBTemplate t)  = "BBTemplate " <> show t
-  show (BBFunction nm hsh _) =
-    "<TemplateFunction(nm=" ++ show nm ++ ", hash=" ++ show hsh ++ ")>"
+  showsPrec d (BBTemplate t) =
+    showParen (d > 10) $ ("BBTemplate " ++) . showsPrec 11 t
+  showsPrec _ (BBFunction nm hsh _) =
+    ("<TemplateFunction(nm=" ++) . shows nm . (", hash=" ++) . shows hsh .
+    (")>" ++)
 
 instance NFData TemplateFunction where
   rnf (TemplateFunction is f _) = rnf is `seq` f `seq` ()
