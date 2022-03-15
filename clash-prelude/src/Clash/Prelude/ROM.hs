@@ -45,11 +45,11 @@ import           Clash.XException     (NFDataX, deepErrorX)
 
 -- | An asynchronous/combinational ROM with space for @n@ elements
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Prelude.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs.
--- * A large 'Vec' for the content might be too inefficient, depending on how it
+-- * A large 'Vec' for the content may be too inefficient, depending on how it
 -- is constructed. See 'Clash.Prelude.ROM.File.asyncRomFile' and
 -- 'Clash.Prelude.ROM.Blob.asyncRomBlob' for different approaches that scale
 -- well.
@@ -71,11 +71,11 @@ asyncRom = \content rd -> asyncRom# content (fromEnum rd)
 
 -- | An asynchronous/combinational ROM with space for 2^@n@ elements
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Prelude.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs.
--- * A large 'Vec' for the content might be too inefficient, depending on how it
+-- * A large 'Vec' for the content may be too inefficient, depending on how it
 -- is constructed. See 'Clash.Prelude.ROM.File.asyncRomFilePow2' and
 -- 'Clash.Prelude.ROM.Blob.asyncRomBlobPow2' for different approaches that scale
 -- well.
@@ -130,20 +130,20 @@ asyncRom# content = safeAt
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Prelude.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs.
--- * A large 'Vec' for the content might be too inefficient, depending on how it
+-- * A large 'Vec' for the content may be too inefficient, depending on how it
 -- is constructed. See 'Clash.Prelude.ROM.File.romFile' and
 -- 'Clash.Prelude.ROM.Blob.romBlob' for different approaches that scale well.
 rom
   :: forall dom n m a
-   . ( NFDataX a
-     , KnownNat n
-     , KnownNat m
-     , HiddenClock dom
-     , HiddenEnable dom  )
+   . NFDataX a
+  => KnownNat n
+  => KnownNat m
+  => HiddenClock dom
+  => HiddenEnable dom
   => Vec n a
   -- ^ ROM content, also determines the size, @n@, of the ROM
   --
@@ -161,20 +161,20 @@ rom = hideEnable (hideClock E.rom)
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and "Clash.Prelude.BlockRam#usingrams"
 -- for ideas on how to use ROMs and RAMs.
--- * A large 'Vec' for the content might be too inefficient, depending on how it
+-- * A large 'Vec' for the content may be too inefficient, depending on how it
 -- is constructed. See 'Clash.Prelude.ROM.File.romFilePow2' and
 -- 'Clash.Prelude.ROM.Blob.romBlobPow2' for different approaches that scale
 -- well.
 romPow2
   :: forall dom n a
-   . ( KnownNat n
-     , NFDataX a
-     , HiddenClock dom
-     , HiddenEnable dom  )
+   . KnownNat n
+  => NFDataX a
+  => HiddenClock dom
+  => HiddenEnable dom
   => Vec (2^n) a
   -- ^ ROM content
   --

@@ -159,7 +159,7 @@ import Clash.XException      (maybeIsX, seqX, fromJustX, NFDataX(..), XException
 -- | ASIC           | Untested | Untested | Untested      |
 -- +----------------+----------+----------+---------------+
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
 -- block RAM.
@@ -171,7 +171,10 @@ import Clash.XException      (maybeIsX, seqX, fromJustX, NFDataX(..), XException
 -- create your own data files.
 blockRamFilePow2
   :: forall dom n m
-   . (KnownDomain dom, KnownNat m, KnownNat n, HasCallStack)
+   . KnownDomain dom
+  => KnownNat m
+  => KnownNat n
+  => HasCallStack
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -207,7 +210,7 @@ blockRamFilePow2 = \clk en file rd wrM -> withFrozenCallStack
 -- | ASIC           | Untested | Untested | Untested      |
 -- +----------------+----------+----------+---------------+
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Explicit.BlockRam#usingrams" for more information on how to use a
 -- block RAM.
@@ -218,7 +221,11 @@ blockRamFilePow2 = \clk en file rd wrM -> withFrozenCallStack
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for more ideas on how to create
 -- your own data files.
 blockRamFile
-  :: (KnownDomain dom, KnownNat m, Enum addr, NFDataX addr, HasCallStack)
+  :: KnownDomain dom
+  => KnownNat m
+  => Enum addr
+  => NFDataX addr
+  => HasCallStack
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom

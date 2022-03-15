@@ -57,7 +57,7 @@ import Clash.XException (deepErrorX, seqX)
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and
 -- "Clash.Explicit.BlockRam#usingrams" for ideas on how to use ROMs and RAMs.
@@ -87,7 +87,7 @@ romBlob = \clk en content rd -> romBlob# clk en content (fromEnum <$> rd)
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and
 -- "Clash.Explicit.BlockRam#usingrams" for ideas on how to use ROMs and RAMs.

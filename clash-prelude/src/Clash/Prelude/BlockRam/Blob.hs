@@ -49,7 +49,7 @@ import Clash.XException (NFDataX)
 -- 'Clash.XException.XException'
 --
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
 -- block RAM.
@@ -58,11 +58,10 @@ import Clash.XException (NFDataX)
 -- ('blockRamBlob' content) rd wrM@.
 blockRamBlob
   :: forall dom addr m n
-   . ( HiddenClock dom
-     , HiddenEnable dom
-     , Enum addr
-     , NFDataX addr
-     )
+   . HiddenClock dom
+  => HiddenEnable dom
+  => Enum addr
+  => NFDataX addr
   => E.MemBlob n m
   -- ^ Initial content of the BRAM, also determines the size, @n@, of the BRAM
   --
@@ -82,7 +81,7 @@ blockRamBlob = hideEnable (hideClock E.blockRamBlob)
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
 -- block RAM.
@@ -91,10 +90,9 @@ blockRamBlob = hideEnable (hideClock E.blockRamBlob)
 -- ('blockRamBlobPow2' content) rd wrM@.
 blockRamBlobPow2
   :: forall dom m n
-   . ( HiddenClock dom
-     , HiddenEnable dom
-     , KnownNat n
-     )
+   . HiddenClock dom
+  => HiddenEnable dom
+  => KnownNat n
   => E.MemBlob (2^n) m
   -- ^ Initial content of the BRAM, also determines the size, 2^@n@, of the BRAM
   --

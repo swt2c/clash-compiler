@@ -49,18 +49,17 @@ import Clash.XException
 -- * __NB__: Initial content of the RAM is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
 -- RAM.
 asyncRamPow2
   :: forall wdom rdom n a
-   . ( KnownNat n
-     , HasCallStack
-     , KnownDomain wdom
-     , KnownDomain rdom
-     , NFDataX a
-     )
+   . KnownNat n
+  => HasCallStack
+  => KnownDomain wdom
+  => KnownDomain rdom
+  => NFDataX a
   => Clock wdom
    -- ^ 'Clock' to which the write port of the RAM is synchronized
   -> Clock rdom
@@ -83,18 +82,17 @@ asyncRamPow2 = \wclk rclk en rd wrM -> withFrozenCallStack
 -- * __NB__: Initial content of the RAM is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Explicit.BlockRam#usingrams" for more information on how to use a
 -- RAM.
 asyncRam
-  :: ( Enum addr
-     , NFDataX addr
-     , HasCallStack
-     , KnownDomain wdom
-     , KnownDomain rdom
-     , NFDataX a
-     )
+  :: Enum addr
+  => NFDataX addr
+  => HasCallStack
+  => KnownDomain wdom
+  => KnownDomain rdom
+  => NFDataX a
   => Clock wdom
    -- ^ 'Clock' to which the write port of the RAM is synchronized
   -> Clock rdom
@@ -119,11 +117,10 @@ asyncRam = \wclk rclk gen sz rd wrM ->
 -- | RAM primitive
 asyncRam#
   :: forall wdom rdom n a
-   . ( HasCallStack
-     , KnownDomain wdom
-     , KnownDomain rdom
-     , NFDataX a
-     )
+   . HasCallStack
+  => KnownDomain wdom
+  => KnownDomain rdom
+  => NFDataX a
   => Clock wdom
    -- ^ 'Clock' to which the write port of the RAM is synchronized
   -> Clock rdom

@@ -122,7 +122,7 @@ import           Clash.Sized.Unsigned         (Unsigned)
 -- | ASIC           | Untested | Untested | Untested      |
 -- +----------------+----------+----------+---------------+
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Prelude.ROM.File#usingromfiles" for more information on how
 -- to instantiate a ROM with the contents of a data file.
@@ -207,7 +207,7 @@ asyncRomFile sz file = asyncRomFile# sz file . fromEnum
 -- | ASIC           | Untested | Untested | Untested      |
 -- +----------------+----------+----------+---------------+
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Prelude.ROM.File#usingromfiles" for more information on how
 -- to instantiate a ROM with the contents of a data file.
@@ -277,19 +277,18 @@ asyncRomFile# sz file = (content !) -- Leave "(content !)" eta-reduced, see
 -- | ASIC           | Untested | Untested | Untested      |
 -- +----------------+----------+----------+---------------+
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Prelude.ROM.File#usingromfiles" for more information on how
 -- to instantiate a ROM with the contents of a data file.
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 romFile
-  :: ( KnownNat m
-     , KnownNat n
-     , HiddenClock dom
-     , HiddenEnable dom
-     , Enum addr
-     )
+  :: KnownNat m
+  => KnownNat n
+  => HiddenClock dom
+  => HiddenEnable dom
+  => Enum addr
   => SNat n
   -- ^ Size of the ROM
   -> FilePath
@@ -320,7 +319,7 @@ romFile = hideEnable (hideClock E.romFile)
 -- | ASIC           | Untested | Untested | Untested      |
 -- +----------------+----------+----------+---------------+
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Prelude.ROM.File#usingromfiles" for more information on how
 -- to instantiate a ROM with the contents of a data file.
@@ -328,11 +327,10 @@ romFile = hideEnable (hideClock E.romFile)
 -- own data files.
 romFilePow2
   :: forall n m dom
-   . ( KnownNat m
-     , KnownNat n
-     , HiddenClock dom
-     , HiddenEnable dom
-     )
+   . KnownNat m
+  => KnownNat n
+  => HiddenClock dom
+  => HiddenEnable dom
   => FilePath
   -- ^ File describing the content of the ROM
   -> Signal dom (Unsigned n)

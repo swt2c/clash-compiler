@@ -690,12 +690,12 @@ prog2 = -- 0 := 4
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
 -- Block RAM.
 -- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @'readNew' ('blockRam' inits) rd wrM@.
--- * A large 'Vec' for the initial content might be too inefficient, depending
+-- * A large 'Vec' for the initial content may be too inefficient, depending
 -- on how it is constructed. See 'Clash.Prelude.BlockRam.File.blockRamFile' and
 -- 'Clash.Prelude.BlockRam.Blob.blockRamBlob' for different approaches that
 -- scale well.
@@ -710,12 +710,12 @@ prog2 = -- 0 := 4
 -- bram40 = 'blockRam' ('Clash.Sized.Vector.replicate' d40 1)
 -- @
 blockRam
-  :: ( HasCallStack
-     , HiddenClock dom
-     , HiddenEnable dom
-     , NFDataX a
-     , Enum addr
-     , NFDataX addr )
+  :: HasCallStack
+  => HiddenClock dom
+  => HiddenEnable dom
+  => NFDataX a
+  => Enum addr
+  => NFDataX addr
   => Vec n a
   -- ^ Initial content of the BRAM, also determines the size, @n@, of the BRAM
   --
@@ -730,20 +730,20 @@ blockRam = \cnt rd wrM -> withFrozenCallStack
   (hideEnable (hideClock E.blockRam) cnt rd wrM)
 {-# INLINE blockRam #-}
 
--- | Version of 'blockRam' that has no default values set. May be cleared to an
--- arbitrary state using a reset function.
+-- | A version of 'blockRam' that has no default values set. May be cleared to
+-- an arbitrary state using a reset function.
 blockRamU
-   :: forall n dom a r addr
-   . ( HasCallStack
-     , HiddenClockResetEnable dom
-     , NFDataX a
-     , Enum addr
-     , NFDataX addr
-     , 1 <= n )
+  :: forall n dom a r addr
+   . HasCallStack
+  => HiddenClockResetEnable dom
+  => NFDataX a
+  => Enum addr
+  => NFDataX addr
+  => 1 <= n
   => E.ResetStrategy r
   -- ^ Whether to clear BRAM on asserted reset ('Clash.Explicit.BlockRam.ClearOnReset')
-  -- or not ('Clash.Explicit.BlockRam.NoClearOnReset'). Reset needs to be
-  -- asserted at least /n/ cycles to clear the BRAM.
+  -- or not ('Clash.Explicit.BlockRam.NoClearOnReset'). The reset needs to be
+  -- asserted for at least /n/ cycles to clear the BRAM.
   -> SNat n
   -- ^ Number of elements in BRAM
   -> (Index n -> a)
@@ -759,20 +759,20 @@ blockRamU =
     (hideClockResetEnable E.blockRamU) rstStrategy cnt initF rd wrM
 {-# INLINE blockRamU #-}
 
--- | Version of 'blockRam' that is initialized with the same value on all
+-- | A version of 'blockRam' that is initialized with the same value on all
 -- memory positions
 blockRam1
-   :: forall n dom a r addr
-   . ( HasCallStack
-     , HiddenClockResetEnable dom
-     , NFDataX a
-     , Enum addr
-     , NFDataX addr
-     , 1 <= n )
+  :: forall n dom a r addr
+   . HasCallStack
+  => HiddenClockResetEnable dom
+  => NFDataX a
+  => Enum addr
+  => NFDataX addr
+  => 1 <= n
   => E.ResetStrategy r
   -- ^ Whether to clear BRAM on asserted reset ('Clash.Explicit.BlockRam.ClearOnReset')
-  -- or not ('Clash.Explicit.BlockRam.NoClearOnReset'). Reset needs to be
-  -- asserted at least /n/ cycles to clear the BRAM.
+  -- or not ('Clash.Explicit.BlockRam.NoClearOnReset'). The reset needs to be
+  -- asserted for at least /n/ cycles to clear the BRAM.
   -> SNat n
   -- ^ Number of elements in BRAM
   -> a
@@ -794,12 +794,12 @@ blockRam1 =
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
 -- block RAM.
 -- * Use the adapter 'readNew' for obtaining write-before-read semantics like this: @'readNew' ('blockRamPow2' inits) rd wrM@.
--- * A large 'Vec' for the initial content might be too inefficient, depending
+-- * A large 'Vec' for the initial content may be too inefficient, depending
 -- on how it is constructed. See 'Clash.Prelude.BlockRam.File.blockRamFilePow2'
 -- and 'Clash.Prelude.BlockRam.Blob.blockRamBlobPow2' for different approaches
 -- that scale well.
@@ -814,12 +814,11 @@ blockRam1 =
 -- bram32 = 'blockRamPow2' ('Clash.Sized.Vector.replicate' d32 1)
 -- @
 blockRamPow2
-  :: ( HasCallStack
-     , HiddenClock dom
-     , HiddenEnable dom
-     , NFDataX a
-     , KnownNat n
-     )
+  :: HasCallStack
+  => HiddenClock dom
+  => HiddenEnable dom
+  => NFDataX a
+  => KnownNat n
   => Vec (2^n) a
   -- ^ Initial content of the BRAM
   --
@@ -835,7 +834,7 @@ blockRamPow2 = \cnt rd wrM -> withFrozenCallStack
   (hideEnable (hideClock E.blockRamPow2) cnt rd wrM)
 {-# INLINE blockRamPow2 #-}
 
--- | Create read-after-write block RAM from read-before-write one
+-- | Create a read-after-write block RAM from a read-before-write one
 --
 -- >>> :t readNew (blockRam (0 :> 1 :> Nil))
 -- readNew (blockRam (0 :> 1 :> Nil))
@@ -867,15 +866,14 @@ readNew = hideClockResetEnable E.readNew
 -- value that will be read on that port, i.e. the same-port read/write behavior
 -- is: WriteFirst. For mixed-port read/write, when port A writes to the address
 -- port B reads from, the output of port B is undefined, and vice versa.
-trueDualPortBlockRam ::
+trueDualPortBlockRam
 #ifdef CLASH_MULTIPLE_HIDDEN
-  forall nAddrs dom1 dom2 a .
-  ( HasCallStack
-  , KnownNat nAddrs
-  , HiddenClock dom1
-  , HiddenClock dom2
-  , NFDataX a
-  )
+  :: forall nAddrs dom1 dom2 a
+   . HasCallStack
+  => KnownNat nAddrs
+  => HiddenClock dom1
+  => HiddenClock dom2
+  => NFDataX a
   => Signal dom1 (E.RamOp nAddrs a)
   -- ^ RAM operation for port A
   -> Signal dom2 (E.RamOp nAddrs a)
@@ -886,12 +884,11 @@ trueDualPortBlockRam ::
 trueDualPortBlockRam inA inB =
   E.trueDualPortBlockRam (hasClock @dom1) (hasClock @dom2) inA inB
 #else
-  forall nAddrs dom a .
-  ( HasCallStack
-  , KnownNat nAddrs
-  , HiddenClock dom
-  , NFDataX a
-  )
+  :: forall nAddrs dom a
+   . HasCallStack
+  => KnownNat nAddrs
+  => HiddenClock dom
+  => NFDataX a
   => Signal dom (E.RamOp nAddrs a)
   -- ^ RAM operation for port A
   -> Signal dom (E.RamOp nAddrs a)

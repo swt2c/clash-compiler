@@ -127,7 +127,7 @@ import Clash.XException             (NFDataX(deepErrorX))
 -- | ASIC           | Untested | Untested | Untested      |
 -- +----------------+----------+----------+---------------+
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Explicit.ROM.File#usingromfiles" for more information on how
 -- to instantiate a ROM with the contents of a data file.
@@ -169,7 +169,7 @@ romFilePow2 = \clk en -> romFile clk en (pow2SNat (SNat @n))
 -- | ASIC           | Untested | Untested | Untested      |
 -- +----------------+----------+----------+---------------+
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Explicit.ROM.File#usingromfiles" for more information on how
 -- to instantiate a ROM with the contents of a data file.

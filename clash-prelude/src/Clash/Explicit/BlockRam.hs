@@ -11,9 +11,9 @@ Block RAM primitives
 = Using RAMs #usingrams#
 
 We will show a rather elaborate example on how you can, and why you might want
-to use 'blockRam's. We will build a \"small\" CPU + Memory + Program ROM where
-we will slowly evolve to using 'blockRam's. Note that the code is /not/ meant as
-a de-facto standard on how to do CPU design in Clash.
+to use block RAMs. We will build a \"small\" CPU + Memory + Program ROM where we
+will slowly evolve to using block RAMs. Note that the code is /not/ meant as a
+de-facto standard on how to do CPU design in Clash.
 
 We start with the definition of the Instructions, Register names and machine
 codes:
@@ -261,16 +261,15 @@ especially as the memories we need for our application get bigger. The
 'blockRam' function will be translated to such a /block RAM/.
 
 One important aspect of block RAMs is that they have a /synchronous/ read port,
-meaning that, unlike the behavior of 'Clash.Prelude.RAM.asyncRam', given a read
-address @r@ at time @t@, the value @v@ in the RAM at address @r@ is only
-available at time @t+1@.
+meaning unlike an 'Clash.Prelude.RAM.asyncRam', the result of a read command
+given at time @t@ becomes available at time @t + 1@.
 
 For us that means we need to change the design of our CPU. Right now, upon a
 load instruction we generate a read address for the memory, and the value at
-that read address is immediately available to be put in the register bank.
-Because we will be using a block RAM, the value is delayed until the next cycle.
-Thus, we will need to also delay the register address to which the memory
-address is loaded:
+that read address is immediately available to be put in the register bank. We
+will be using a block RAM, so the value is delayed until the next cycle. Thus,
+we will also need to delay the register address to which the memory address is
+loaded:
 
 @
 cpu2
@@ -335,7 +334,7 @@ system3 instrs clk rst en = memOut
 We are, however, not done. We will also need to update our program. The reason
 being that values that we try to load in our registers won't be loaded into the
 register until the next cycle. This is a problem when the next instruction
-immediately depends on this memory value. In our case, this was only the case
+immediately depends on this memory value. In our example, this was only the case
 when we loaded the value @6@, which was stored at address @1@, into @RegB@.
 Our updated program is thus:
 
@@ -744,13 +743,13 @@ prog2 = -- 0 := 4
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
 -- 'XException'
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Explicit.BlockRam#usingrams" for more information on how to use a
 -- block RAM.
 -- * Use the adapter 'readNew' for obtaining write-before-read semantics like
 -- this: @'readNew' clk rst en ('blockRam' clk inits) rd wrM@.
--- * A large 'Vec' for the initial content might be too inefficient, depending
+-- * A large 'Vec' for the initial content may be too inefficient, depending
 -- on how it is constructed. See 'Clash.Explicit.BlockRam.File.blockRamFile' and
 -- 'Clash.Explicit.BlockRam.Blob.blockRamBlob' for different approaches that
 -- scale well.
@@ -766,11 +765,11 @@ prog2 = -- 0 := 4
 -- bram40 clk en = 'blockRam' clk en ('Clash.Sized.Vector.replicate' d40 1)
 -- @
 blockRam
-  :: ( KnownDomain dom
-     , HasCallStack
-     , NFDataX a
-     , Enum addr
-     , NFDataX addr )
+  :: KnownDomain dom
+  => HasCallStack
+  => NFDataX a
+  => Enum addr
+  => NFDataX addr
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -798,13 +797,13 @@ blockRam = \clk gen content rd wrM ->
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
 -- 'XException'
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
 -- block RAM.
 -- * Use the adapter 'readNew' for obtaining write-before-read semantics like
 -- this: @'readNew' clk rst en ('blockRamPow2' clk inits) rd wrM@.
--- * A large 'Vec' for the initial content might be too inefficient, depending
+-- * A large 'Vec' for the initial content may be too inefficient, depending
 -- on how it is constructed. See 'Clash.Explicit.BlockRam.File.blockRamFilePow2'
 -- and 'Clash.Explicit.BlockRam.Blob.blockRamBlobPow2' for different approaches
 -- that scale well.
@@ -820,10 +819,10 @@ blockRam = \clk gen content rd wrM ->
 -- bram32 clk en = 'blockRamPow2' clk en ('Clash.Sized.Vector.replicate' d32 1)
 -- @
 blockRamPow2
-  :: ( KnownDomain dom
-     , HasCallStack
-     , NFDataX a
-     , KnownNat n )
+  :: KnownDomain dom
+  => HasCallStack
+  => NFDataX a
+  => KnownNat n
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Enable dom
@@ -846,27 +845,27 @@ data ResetStrategy (r :: Bool) where
   ClearOnReset :: ResetStrategy 'True
   NoClearOnReset :: ResetStrategy 'False
 
--- | Version of 'blockRam' that has no default values set. May be cleared to an
--- arbitrary state using a reset function.
+-- | A version of 'blockRam' that has no default values set. May be cleared to
+-- an arbitrary state using a reset function.
 blockRamU
-   :: forall n dom a r addr
-   . ( KnownDomain dom
-     , HasCallStack
-     , NFDataX a
-     , Enum addr
-     , NFDataX addr
-     , 1 <= n )
+  :: forall n dom a r addr
+   . KnownDomain dom
+  => HasCallStack
+  => NFDataX a
+  => Enum addr
+  => NFDataX addr
+  => 1 <= n
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Reset dom
-  -- ^ 'Reset' line. Needs to be asserted at least /n/ cycles in order
+  -- ^ 'Reset' line. This needs to be asserted for at least /n/ cycles in order
   -- for the BRAM to be reset to its initial state.
   -> Enable dom
   -- ^ 'Enable' line
   -> ResetStrategy r
   -- ^ Whether to clear BRAM on asserted reset ('ClearOnReset') or
-  -- not ('NoClearOnReset'). Reset needs to be asserted at least /n/ cycles to
-  -- clear the BRAM.
+  -- not ('NoClearOnReset'). The reset needs to be asserted for at least /n/
+  -- cycles to clear the BRAM.
   -> SNat n
   -- ^ Number of elements in BRAM
   -> (Index n -> a)
@@ -938,27 +937,27 @@ blockRamU# clk en SNat =
 {-# NOINLINE blockRamU# #-}
 {-# ANN blockRamU# hasBlackBox #-}
 
--- | Version of 'blockRam' that is initialized with the same value on all
+-- | A version of 'blockRam' that is initialized with the same value on all
 -- memory positions
 blockRam1
-   :: forall n dom a r addr
-   . ( KnownDomain dom
-     , HasCallStack
-     , NFDataX a
-     , Enum addr
-     , NFDataX addr
-     , 1 <= n )
+  :: forall n dom a r addr
+   . KnownDomain dom
+  => HasCallStack
+  => NFDataX a
+  => Enum addr
+  => NFDataX addr
+  => 1 <= n
   => Clock dom
   -- ^ 'Clock' to synchronize to
   -> Reset dom
-  -- ^ 'Reset' line. Needs to be asserted at least /n/ cycles in order
+  -- ^ 'Reset' line. This needs to be asserted for at least /n/ cycles in order
   -- for the BRAM to be reset to its initial state.
   -> Enable dom
   -- ^ 'Enable' line
   -> ResetStrategy r
   -- ^ Whether to clear BRAM on asserted reset ('ClearOnReset') or
-  -- not ('NoClearOnReset'). Reset needs to be asserted at least /n/ cycles to
-  -- clear the BRAM.
+  -- not ('NoClearOnReset'). The reset needs to be asserted for at least /n/
+  -- cycles to clear the BRAM.
   -> SNat n
   -- ^ Number of elements in BRAM
   -> a
@@ -1122,7 +1121,7 @@ blockRam# (Clock _) gen content = \rd wen waS wd -> runST $ do
 {-# ANN blockRam# hasBlackBox #-}
 {-# NOINLINE blockRam# #-}
 
--- | Create read-after-write block RAM from read-before-write one
+-- | Create a read-after-write block RAM from a read-before-write one
 readNew
   :: ( KnownDomain dom
      , NFDataX a
@@ -1180,14 +1179,13 @@ isOp _       = True
 -- value that will be read on that port, i.e. the same-port read/write behavior
 -- is: WriteFirst. For mixed-port read/write, when port A writes to the address
 -- port B reads from, the output of port B is undefined, and vice versa.
-trueDualPortBlockRam ::
-  forall nAddrs domA domB a .
-  ( HasCallStack
-  , KnownNat nAddrs
-  , KnownDomain domA
-  , KnownDomain domB
-  , NFDataX a
-  )
+trueDualPortBlockRam
+  :: forall nAddrs domA domB a
+   . HasCallStack
+  => KnownNat nAddrs
+  => KnownDomain domA
+  => KnownDomain domB
+  => NFDataX a
   => Clock domA
   -- ^ Clock for port A
   -> Clock domB

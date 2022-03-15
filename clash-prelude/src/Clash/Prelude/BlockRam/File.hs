@@ -38,7 +38,7 @@ Such a file can be produced with 'E.memFile':
 writeFile "memory.bin" (memFile Nothing [7 :: Unsigned 9 .. 13])
 @
 
-We can instantiate a block RAM using the content of the file above like so:
+We can instantiate a block RAM using the contents of the file above like so:
 
 @
 f :: (HiddenClock dom, HiddenEnable dom)
@@ -123,7 +123,7 @@ import           Clash.XException             (NFDataX)
 -- | ASIC           | Untested | Untested | Untested      |
 -- +----------------+----------+----------+---------------+
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
 -- block RAM.
@@ -134,11 +134,11 @@ import           Clash.XException             (NFDataX)
 -- own data files.
 blockRamFilePow2
   :: forall dom  n m
-   . ( KnownNat m
-     , KnownNat n
-     , HiddenClock dom
-     , HiddenEnable dom
-     , HasCallStack )
+   . KnownNat m
+  => KnownNat n
+  => HiddenClock dom
+  => HiddenEnable dom
+  => HasCallStack
   => FilePath
   -- ^ File describing the initial content of the BRAM
   -> Signal dom (Unsigned n)
@@ -170,7 +170,7 @@ blockRamFilePow2 = \fp rd wrM -> withFrozenCallStack
 -- | ASIC           | Untested | Untested | Untested      |
 -- +----------------+----------+----------+---------------+
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
 -- block RAM.
@@ -180,12 +180,12 @@ blockRamFilePow2 = \fp rd wrM -> withFrozenCallStack
 -- * See "Clash.Sized.Fixed#creatingdatafiles" for ideas on how to create your
 -- own data files.
 blockRamFile
-  :: ( KnownNat m
-     , Enum addr
-     , NFDataX addr
-     , HiddenClock dom
-     , HiddenEnable dom
-     , HasCallStack )
+  :: KnownNat m
+  => Enum addr
+  => NFDataX addr
+  => HiddenClock dom
+  => HiddenEnable dom
+  => HasCallStack
   => SNat n
   -- ^ Size of the BRAM
   -> FilePath

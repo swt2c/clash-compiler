@@ -78,7 +78,7 @@ import Clash.XException
 -- 'Clash.XException.XException'
 --
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
 -- block RAM.
@@ -117,7 +117,7 @@ blockRamBlob = \clk gen content@MemBlob{} rd wrM ->
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
 -- 'XException'
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
 -- block RAM.

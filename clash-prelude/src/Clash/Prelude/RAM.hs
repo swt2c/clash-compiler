@@ -39,18 +39,17 @@ import           Clash.XException     (NFDataX)
 -- * __NB__: Initial content of the RAM is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
 -- RAM.
 asyncRam
-  :: ( Enum addr
-     , NFDataX addr
-     , HiddenClock dom
-     , HiddenEnable dom
-     , HasCallStack
-     , NFDataX a
-     )
+  :: Enum addr
+  => NFDataX addr
+  => HiddenClock dom
+  => HiddenEnable dom
+  => HasCallStack
+  => NFDataX a
   => SNat n
   -- ^ Size @n@ of the RAM
   -> Signal dom addr
@@ -68,17 +67,16 @@ asyncRam = \sz rd wrM -> withFrozenCallStack
 -- * __NB__: Initial content of the RAM is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Prelude.BlockRam#usingrams" for more information on how to use a
 -- RAM.
 asyncRamPow2
-  :: ( KnownNat n
-     , HiddenClock dom
-     , HiddenEnable dom
-     , HasCallStack
-     , NFDataX a
-     )
+  :: KnownNat n
+  => HiddenClock dom
+  => HiddenEnable dom
+  => HasCallStack
+  => NFDataX a
   => Signal dom (Unsigned n)
   -- ^ Read address @r@
   -> Signal dom (Maybe (Unsigned n, a))

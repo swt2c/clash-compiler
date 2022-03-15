@@ -57,7 +57,7 @@ import Clash.XException (deepErrorX)
 
 -- | An asynchronous/combinational ROM with space for @n@ elements
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and
 -- "Clash.Prelude.BlockRam#usingrams" for ideas on how to use ROMs and RAMs.
@@ -76,7 +76,7 @@ asyncRomBlob = \content rd -> asyncRomBlob# content (fromEnum rd)
 
 -- | An asynchronous/combinational ROM with space for 2^@n@ elements
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and
 -- "Clash.Prelude.BlockRam#usingrams" for ideas on how to use ROMs and RAMs.
@@ -126,16 +126,15 @@ asyncRomBlob# content@MemBlob{} = safeAt
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and
 -- "Clash.Explicit.BlockRam#usingrams" for ideas on how to use ROMs and RAMs.
 romBlob
   :: forall dom addr m n
-   . ( HiddenClock dom
-     , HiddenEnable dom
-     , Enum addr
-     )
+   . HiddenClock dom
+  => HiddenEnable dom
+  => Enum addr
   => MemBlob n m
   -- ^ ROM content, also determines the size, @n@, of the ROM
   --
@@ -153,16 +152,15 @@ romBlob = hideEnable (hideClock E.romBlob)
 -- * __NB__: Initial output value is /undefined/, reading it will throw an
 -- 'Clash.XException.XException'
 --
--- Additional helpful information:
+-- === See also:
 --
 -- * See "Clash.Sized.Fixed#creatingdatafiles" and
 -- "Clash.Explicit.BlockRam#usingrams" for ideas on how to use ROMs and RAMs.
 romBlobPow2
   :: forall dom m n
-   . ( HiddenClock dom
-     , HiddenEnable dom
-     , KnownNat n
-     )
+   . HiddenClock dom
+  => HiddenEnable dom
+  => KnownNat n
   => MemBlob (2^n) m
   -- ^ ROM content, also determines the size, 2^@n@, of the ROM
   --
